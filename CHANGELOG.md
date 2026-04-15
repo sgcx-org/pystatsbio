@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0
 
 ### batch_auc GPU — Fully Vectorized (49-63x speedup on CUDA)
 
