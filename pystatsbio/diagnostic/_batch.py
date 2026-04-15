@@ -83,12 +83,12 @@ def _batch_auc_gpu(
 ) -> BatchAUCResult:
     """Batched AUC + DeLong SE on GPU via PyTorch.
 
-    Uses batched argsort for column-wise ranking, then a single
-    matrix-vector product for the Mann-Whitney sum across all markers.
+    Fully vectorized: no Python loops over markers or samples.
+    Uses batched argsort for ranking and vectorized tie detection
+    via diff-based boundary detection with cumsum grouping.
     """
     import torch
 
-    # Select device
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -96,7 +96,6 @@ def _batch_auc_gpu(
     else:
         device = torch.device("cpu")
 
-    # MPS uses float32, others float64
     dtype = torch.float32 if device.type == "mps" else torch.float64
 
     N, M = predictors.shape
@@ -106,74 +105,29 @@ def _batch_auc_gpu(
 
     pred_t = torch.from_numpy(predictors).to(device=device, dtype=dtype)
 
-    # Column-wise ranking via argsort-of-argsort (handles ties with average)
-    # For GPU efficiency, use the argsort approach:
-    # rank[i] = position of element i in sorted order
-    # For ties, we need midranks which requires more work.
-    # Use argsort twice: argsort gives sorted indices, inverting gives ranks.
-    sorted_indices = pred_t.argsort(dim=0)           # (N, M)
-    ranks = torch.empty_like(pred_t)
-    base_ranks = torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M)
-    ranks.scatter_(0, sorted_indices, base_ranks)
+    # Pooled midranks — fully vectorized across all M columns
+    pooled_ranks_gpu = _midranks_vectorized(pred_t, device, dtype)
 
-    # Midrank correction for ties
-    # Group equal values and assign their mean rank (per-column loop)
-    sorted_vals = pred_t.gather(0, sorted_indices)  # (N, M) sorted
-    sorted_ranks = (
-        torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M).clone()
-    )
-
-    # Group boundaries in sorted order
-    for m_idx in range(M):
-        col_sorted = sorted_vals[:, m_idx]
-        col_ranks = sorted_ranks[:, m_idx]
-        # Find runs of equal values
-        i = 0
-        while i < N:
-            j = i + 1
-            while j < N and col_sorted[j] == col_sorted[i]:
-                j += 1
-            if j > i + 1:
-                # Tied block [i, j): assign midrank
-                midrank = (i + 1 + j) / 2.0
-                col_ranks[i:j] = midrank
-            i = j
-
-    # Scatter midranks back to original positions
-    pooled_ranks_gpu = torch.empty_like(pred_t)
-    pooled_ranks_gpu.scatter_(0, sorted_indices, sorted_ranks)
-
-    # AUC: sum of case ranks - n1*(n1+1)/2, divided by n1*n0
+    # AUC via Mann-Whitney
     case_mask_t = torch.from_numpy(case_mask_np).to(device=device)
-    case_ranks_pooled = pooled_ranks_gpu[case_mask_t]  # (n1, M)
-    sum_case_ranks = case_ranks_pooled.sum(dim=0)  # (M,)
+    sum_case_ranks = pooled_ranks_gpu[case_mask_t].sum(dim=0)  # (M,)
     auc_t = (sum_case_ranks - n1 * (n1 + 1) / 2) / (n1 * n0)
 
-    # DeLong SE: need within-group ranks for cases and controls separately
-    # Rank cases among cases only
+    # DeLong SE: within-group ranks for placement values
     case_pred = pred_t[case_mask_t]      # (n1, M)
     ctrl_pred = pred_t[~case_mask_t]     # (n0, M)
 
-    case_within_ranks = _midranks_gpu(case_pred, device, dtype)  # (n1, M)
-    ctrl_within_ranks = _midranks_gpu(ctrl_pred, device, dtype)  # (n0, M)
+    case_within_ranks = _midranks_vectorized(case_pred, device, dtype)
+    ctrl_within_ranks = _midranks_vectorized(ctrl_pred, device, dtype)
 
-    # Placement values
-    V10 = (pooled_ranks_gpu[case_mask_t] - case_within_ranks) / n0  # (n1, M)
-    V01 = 1.0 - (pooled_ranks_gpu[~case_mask_t] - ctrl_within_ranks) / n1  # (n0, M)
+    V10 = (pooled_ranks_gpu[case_mask_t] - case_within_ranks) / n0
+    V01 = 1.0 - (pooled_ranks_gpu[~case_mask_t] - ctrl_within_ranks) / n1
 
-    # Variance per marker
-    auc_expanded = auc_t.unsqueeze(0)  # (1, M)
-    if n1 > 1:
-        S10 = ((V10 - auc_expanded) ** 2).sum(dim=0) / (n1 - 1)  # (M,)
-    else:
-        S10 = torch.zeros(M, device=device, dtype=dtype)
-    if n0 > 1:
-        S01 = ((V01 - auc_expanded) ** 2).sum(dim=0) / (n0 - 1)  # (M,)
-    else:
-        S01 = torch.zeros(M, device=device, dtype=dtype)
+    auc_expanded = auc_t.unsqueeze(0)
+    S10 = ((V10 - auc_expanded) ** 2).sum(dim=0) / max(n1 - 1, 1)
+    S01 = ((V01 - auc_expanded) ** 2).sum(dim=0) / max(n0 - 1, 1)
 
-    var_auc = S10 / n1 + S01 / n0
-    se_t = torch.sqrt(var_auc)
+    se_t = torch.sqrt(S10 / n1 + S01 / n0)
 
     return BatchAUCResult(
         auc=auc_t.cpu().numpy().astype(np.float64),
@@ -182,34 +136,76 @@ def _batch_auc_gpu(
     )
 
 
-def _midranks_gpu(
+def _midranks_vectorized(
     data: torch.Tensor,
     device: torch.device,
     dtype: torch.dtype,
 ) -> torch.Tensor:
-    """Compute midranks column-wise for a (N, M) tensor on GPU."""
+    """Compute midranks column-wise for a (N, M) tensor — fully vectorized.
+
+    No Python loops over columns or rows. Tie detection uses diff-based
+    boundary detection: consecutive equal values in sorted order form a
+    tie group. Each group's midrank = mean of its positional ranks.
+
+    Algorithm:
+        1. argsort each column
+        2. Detect tie boundaries via diff == 0 across sorted values
+        3. Assign group IDs via cumsum of boundary flags
+        4. Compute group midranks via scatter-add and scatter-count
+        5. Map midranks back to original positions
+    """
     import torch
 
     N, M = data.shape
-    sorted_indices = data.argsort(dim=0)
-    sorted_vals = data.gather(0, sorted_indices)
-    ranks = torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M).clone()
 
-    # Fix ties to midranks
-    for m_idx in range(M):
-        col_sorted = sorted_vals[:, m_idx]
-        col_ranks = ranks[:, m_idx]
-        i = 0
-        while i < N:
-            j = i + 1
-            while j < N and col_sorted[j] == col_sorted[i]:
-                j += 1
-            if j > i + 1:
-                col_ranks[i:j] = (i + 1 + j) / 2.0
-            i = j
+    sorted_indices = data.argsort(dim=0)                   # (N, M)
+    sorted_vals = data.gather(0, sorted_indices)            # (N, M)
 
+    # Base ranks: 1, 2, ..., N for each column
+    base_ranks = torch.arange(
+        1, N + 1, device=device, dtype=dtype,
+    ).unsqueeze(1).expand(N, M)
+
+    # Detect tie boundaries: where consecutive sorted values differ
+    # diff[i] = 1 if sorted_vals[i] != sorted_vals[i-1], else 0
+    # First element always starts a new group
+    diffs = (sorted_vals[1:] != sorted_vals[:-1]).to(dtype)  # (N-1, M)
+    boundaries = torch.cat([
+        torch.ones(1, M, device=device, dtype=dtype),
+        diffs,
+    ], dim=0)  # (N, M)
+
+    # Group IDs via cumsum: each new boundary increments the group ID
+    group_ids = boundaries.cumsum(dim=0).long()  # (N, M)
+    n_groups_per_col = group_ids[-1]              # (M,) — max group ID per column
+
+    # For each group, compute sum of ranks and count of members
+    # Then midrank = sum_of_ranks / count
+    # Use a flat scatter approach: flatten (N, M) into (N*M,) with offset per column
+    max_groups = int(n_groups_per_col.max().item())
+    col_offsets = (
+        torch.arange(M, device=device).unsqueeze(0) * (max_groups + 1)
+    )  # (1, M)
+    flat_group_ids = (group_ids + col_offsets).reshape(-1)   # (N*M,)
+    flat_ranks = base_ranks.reshape(-1)                       # (N*M,)
+    total_bins = M * (max_groups + 1)
+
+    # Sum of ranks per group and count per group
+    rank_sums = torch.zeros(total_bins, device=device, dtype=dtype)
+    rank_sums.scatter_add_(0, flat_group_ids, flat_ranks)
+    counts = torch.zeros(total_bins, device=device, dtype=dtype)
+    counts.scatter_add_(0, flat_group_ids, torch.ones_like(flat_ranks))
+
+    # Midrank = sum / count (avoid div-by-zero for unused bins)
+    counts = counts.clamp(min=1)
+    midranks_per_group = rank_sums / counts  # (total_bins,)
+
+    # Map midranks back: each element gets its group's midrank
+    sorted_midranks = midranks_per_group[flat_group_ids].reshape(N, M)
+
+    # Scatter back to original positions
     result = torch.empty_like(data)
-    result.scatter_(0, sorted_indices, ranks)
+    result.scatter_(0, sorted_indices, sorted_midranks)
     return result
 
 
