@@ -11,9 +11,13 @@ GPU is beneficial when ``n_markers > 100``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:
+    import torch
 
 
 @dataclass(frozen=True)
@@ -93,10 +97,7 @@ def _batch_auc_gpu(
         device = torch.device("cpu")
 
     # MPS uses float32, others float64
-    if device.type == "mps":
-        dtype = torch.float32
-    else:
-        dtype = torch.float64
+    dtype = torch.float32 if device.type == "mps" else torch.float64
 
     N, M = predictors.shape
     case_mask_np = response == 1
@@ -112,25 +113,15 @@ def _batch_auc_gpu(
     # Use argsort twice: argsort gives sorted indices, inverting gives ranks.
     sorted_indices = pred_t.argsort(dim=0)           # (N, M)
     ranks = torch.empty_like(pred_t)
-    ranks.scatter_(0, sorted_indices, torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M))
+    base_ranks = torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M)
+    ranks.scatter_(0, sorted_indices, base_ranks)
 
     # Midrank correction for ties
-    # Group equal values and assign their mean rank
+    # Group equal values and assign their mean rank (per-column loop)
     sorted_vals = pred_t.gather(0, sorted_indices)  # (N, M) sorted
-    # Detect group boundaries where consecutive sorted values differ
-    diff = torch.zeros_like(sorted_vals)
-    diff[1:] = (sorted_vals[1:] != sorted_vals[:-1]).to(dtype)
-    # Cumsum of diffs gives group IDs per column
-    group_ids = diff.cumsum(dim=0).long()  # (N, M)
-
-    # For each group, compute mean rank
-    # Scatter group ranks back: first accumulate sum and count per group
-    n_groups = int(group_ids.max().item()) + 1
-
-    # Efficient approach: for each column, the groups are contiguous in sorted
-    # order, so we can use segment-style operations
-    # Simple approach: iterate over ranks in sorted order, fix ties
-    sorted_ranks = torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M).clone()
+    sorted_ranks = (
+        torch.arange(1, N + 1, device=device, dtype=dtype).unsqueeze(1).expand(N, M).clone()
+    )
 
     # Group boundaries in sorted order
     for m_idx in range(M):
@@ -192,10 +183,10 @@ def _batch_auc_gpu(
 
 
 def _midranks_gpu(
-    data: "torch.Tensor",
-    device: "torch.device",
-    dtype: "torch.dtype",
-) -> "torch.Tensor":
+    data: torch.Tensor,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
     """Compute midranks column-wise for a (N, M) tensor on GPU."""
     import torch
 
@@ -271,6 +262,12 @@ def batch_auc(
     if not np.array_equal(unique_labels, np.array([0, 1])):
         raise ValueError(
             f"response must be binary (0/1), got unique values {unique_labels}"
+        )
+
+    if not np.all(np.isfinite(predictors)):
+        raise ValueError(
+            "predictors contains NaN or infinite values. "
+            "Remove or impute missing values before calling batch_auc."
         )
 
     if backend == "cpu":

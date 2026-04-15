@@ -2,7 +2,7 @@
 
 import pytest
 
-from pystatsbio.power import power_anova_oneway, power_anova_factorial
+from pystatsbio.power import power_anova_factorial, power_anova_oneway
 
 
 class TestPowerAnovaOneway:

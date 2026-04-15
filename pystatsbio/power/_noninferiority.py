@@ -14,7 +14,6 @@ from scipy.stats import norm
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 
-
 # ---------------------------------------------------------------------------
 # Non-inferiority for means
 # ---------------------------------------------------------------------------

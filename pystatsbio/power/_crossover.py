@@ -14,7 +14,6 @@ from scipy.stats import t as t_dist
 
 from pystatsbio.power._common import PowerResult, _solve_parameter
 
-
 # ---------------------------------------------------------------------------
 # Internal power computation
 # ---------------------------------------------------------------------------

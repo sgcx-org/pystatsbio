@@ -44,7 +44,7 @@ class CurveParams:
         from pystatsbio.doseresponse._models import _MODEL_MAP
 
         _, param_names = _MODEL_MAP[model]
-        d = dict(zip(param_names, params))
+        d = dict(zip(param_names, params, strict=True))
         return CurveParams(
             bottom=d["bottom"],
             top=d["top"],

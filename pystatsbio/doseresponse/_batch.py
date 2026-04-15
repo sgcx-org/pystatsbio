@@ -13,11 +13,15 @@ scale so the optimisation is unconstrained.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from numpy.typing import NDArray
 
 from pystatsbio.doseresponse._common import BatchDoseResponseResult
 
+if TYPE_CHECKING:
+    import torch
 
 # ---------------------------------------------------------------------------
 # CPU fallback
@@ -50,7 +54,10 @@ def _batch_cpu(
             bottom[i] = result.params.bottom
             converged[i] = result.converged
             rss[i] = result.rss
-        except Exception:
+        except (ValueError, RuntimeError):
+            # Fitting failed for this compound (bad data or no convergence).
+            # Mark as unconverged with NaN parameters; do not swallow
+            # programming errors (TypeError, AttributeError, etc.).
             ec50[i] = hill[i] = top[i] = bottom[i] = rss[i] = np.nan
             converged[i] = False
 
@@ -86,10 +93,7 @@ def _batch_gpu(
         device = torch.device("cpu")
 
     # MPS (Apple Silicon) does not support float64 — use float32 there
-    if device.type == "mps":
-        dtype = torch.float32
-    else:
-        dtype = torch.float64
+    dtype = torch.float32 if device.type == "mps" else torch.float64
 
     # Adapt numerical constants for precision of chosen dtype
     is_f32 = (dtype == torch.float32)
@@ -204,12 +208,12 @@ def _batch_gpu(
 
 
 def _batch_init_gpu(
-    dose_t: "torch.Tensor",
-    resp_t: "torch.Tensor",
-    log_dose: "torch.Tensor",
-    device: "torch.device",
-    dtype: "torch.dtype",
-) -> "torch.Tensor":
+    dose_t: torch.Tensor,
+    resp_t: torch.Tensor,
+    log_dose: torch.Tensor,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
     """Vectorised self-starting for all K compounds.
 
     Returns ``(K, 4)`` tensor: ``[bottom, top, log_ec50, hill]``.

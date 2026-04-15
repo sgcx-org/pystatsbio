@@ -16,7 +16,6 @@ from scipy import stats
 
 from pystatsbio.diagnostic._common import DiagnosticResult
 
-
 # ---------------------------------------------------------------------------
 # CI helpers for binomial proportions
 # ---------------------------------------------------------------------------
@@ -121,10 +120,7 @@ def diagnostic_accuracy(
         raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
 
     # Classify
-    if direction == "<":
-        predicted_pos = predictor >= cutoff
-    else:
-        predicted_pos = predictor <= cutoff
+    predicted_pos = predictor >= cutoff if direction == "<" else predictor <= cutoff
 
     actual_pos = response == 1
 
@@ -161,15 +157,8 @@ def diagnostic_accuracy(
     npv = (spec * (1 - prev) / npv_denom) if npv_denom > 0 else float("nan")
 
     # Likelihood ratios
-    if (1 - spec) > 0:
-        lr_pos = sens / (1 - spec)
-    else:
-        lr_pos = float("inf")
-
-    if spec > 0:
-        lr_neg = (1 - sens) / spec
-    else:
-        lr_neg = float("inf")
+    lr_pos = sens / (1 - spec) if (1 - spec) > 0 else float("inf")
+    lr_neg = (1 - sens) / spec if spec > 0 else float("inf")
 
     # Diagnostic odds ratio (with 0.5 Haldane correction if any cell is 0)
     z = stats.norm.ppf((1 + conf_level) / 2)

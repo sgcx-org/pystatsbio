@@ -9,6 +9,7 @@ Validates against: EPA BMDS software, R BMDL packages
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -17,7 +18,6 @@ from scipy.optimize import brentq
 from scipy.stats import norm
 
 from pystatsbio.doseresponse._common import CurveParams, DoseResponseResult
-from pystatsbio.doseresponse._models import _MODEL_MAP
 
 
 @dataclass(frozen=True)
@@ -37,30 +37,53 @@ class BMDResult:
 # ---------------------------------------------------------------------------
 
 def _bmd_ll4_analytical(params: CurveParams, target: float) -> float:
-    """Analytical BMD for LL.4: dose = ec50 * ((top-target)/(target-bottom))^(1/hill)."""
+    """Analytical BMD for LL.4: dose = ec50 * ((top-target)/(target-bottom))^(1/hill).
+
+    Raises
+    ------
+    ValueError
+        If the geometry is degenerate (zero denominator, zero numerator,
+        or non-positive ratio — all of which indicate the target is
+        outside the achievable curve range).
+    """
     c, d, e, h = params.bottom, params.top, params.ec50, params.hill
     numer = d - target
     denom = target - c
     if denom == 0 or numer == 0:
-        return float("nan")
+        raise ValueError(
+            f"BMD is undefined: target={target:.4g} is at the curve boundary "
+            f"(bottom={c:.4g}, top={d:.4g}). Adjust bmr."
+        )
     ratio = numer / denom
     if ratio <= 0:
-        return float("nan")
+        raise ValueError(
+            f"BMD is undefined: target={target:.4g} is outside the curve range "
+            f"[{min(c, d):.4g}, {max(c, d):.4g}]."
+        )
     return e * ratio ** (1.0 / h)
 
 
 def _bmd_numerical(params: CurveParams, target: float) -> float:
-    """Numerical BMD via root-finding in log-dose space."""
+    """Numerical BMD via root-finding in log-dose space.
 
+    Raises
+    ------
+    RuntimeError
+        If root-finding fails (target not crossed in log-dose range [-50, 50]).
+    """
     def f(log_dose: float) -> float:
         dose_arr = np.array([np.exp(log_dose)])
         return float(params.predict(dose_arr)[0]) - target
 
     try:
         log_bmd = brentq(f, -50, 50, xtol=1e-12)
-        return float(np.exp(log_bmd))
-    except ValueError:
-        return float("nan")
+    except ValueError as exc:
+        raise RuntimeError(
+            f"BMD root-finding failed: target response {target:.4g} was not "
+            f"crossed in dose range [exp(-50), exp(50)]. "
+            f"Check that bmr is achievable for this curve."
+        ) from exc
+    return float(np.exp(log_bmd))
 
 
 def _bmd_from_params_array(
@@ -81,10 +104,14 @@ def _bmd_delta_ci(
     target: float,
     conf_level: float,
 ) -> tuple[float, float]:
-    """BMDL/BMDU via delta method with numerical gradient."""
-    if np.isnan(bmd_val):
-        return float("nan"), float("nan")
+    """BMDL/BMDU via delta method with numerical gradient.
 
+    Raises
+    ------
+    RuntimeError
+        If the parameter covariance matrix is singular (Jacobian is rank-deficient)
+        or if numerical issues produce a negative variance estimate.
+    """
     params_arr = fit_result.params.to_array()
     n_params = len(params_arr)
     model = fit_result.model
@@ -108,25 +135,29 @@ def _bmd_delta_ci(
 
     try:
         cov = np.linalg.inv(jac.T @ jac) * s2
-    except np.linalg.LinAlgError:
-        return float("nan"), float("nan")
+    except np.linalg.LinAlgError as exc:
+        raise RuntimeError(
+            "Cannot compute BMD confidence interval: the Jacobian matrix is "
+            "rank-deficient. The model may be overparameterised or the fit "
+            "did not converge to a stable solution."
+        ) from exc
 
     var_bmd = float(grad @ cov @ grad)
     if var_bmd < 0:
-        return float("nan"), float("nan")
-    se_bmd = np.sqrt(var_bmd)
+        raise RuntimeError(
+            f"Cannot compute BMD confidence interval: delta-method variance "
+            f"is negative ({var_bmd:.4g}), indicating numerical instability "
+            f"in the covariance matrix. Try a simpler model or more data."
+        )
+    se_bmd = math.sqrt(var_bmd)
 
     z = norm.ppf(1.0 - (1.0 - conf_level) / 2.0)
 
     # CI on log scale (BMD is positive)
-    if bmd_val > 0 and se_bmd > 0:
-        se_log = se_bmd / bmd_val
-        log_bmd = np.log(bmd_val)
-        bmdl = float(np.exp(log_bmd - z * se_log))
-        bmdu = float(np.exp(log_bmd + z * se_log))
-    else:
-        bmdl = float("nan")
-        bmdu = float("nan")
+    se_log = se_bmd / bmd_val
+    log_bmd = math.log(bmd_val)
+    bmdl = math.exp(log_bmd - z * se_log)
+    bmdu = math.exp(log_bmd + z * se_log)
 
     return bmdl, bmdu
 
@@ -162,6 +193,13 @@ def bmd(
     -------
     BMDResult
 
+    Raises
+    ------
+    ValueError
+        If inputs are invalid or the BMR target is outside the curve range.
+    RuntimeError
+        If numerical BMD computation or CI estimation fails.
+
     Notes
     -----
     For **extra risk**: the target response is
@@ -173,6 +211,8 @@ def bmd(
 
     Validates against: EPA BMDS software, R BMDL packages
     """
+    if not math.isfinite(bmr):
+        raise ValueError(f"bmr must be finite, got {bmr}")
     if not (0.0 < bmr < 1.0):
         raise ValueError(f"bmr must be in (0, 1), got {bmr}")
     if bmr_type not in ("extra", "additional"):
@@ -186,10 +226,16 @@ def bmd(
     c, d = p.bottom, p.top
 
     # Compute target response level
-    if bmr_type == "extra":
-        target = d - bmr * (d - c)
-    else:  # additional
-        target = d - bmr * abs(d - c)
+    target = d - bmr * (d - c) if bmr_type == "extra" else d - bmr * abs(d - c)
+
+    # Pre-validate that target is strictly inside the curve range
+    lo, hi = min(c, d), max(c, d)
+    if not (lo < target < hi):
+        raise ValueError(
+            f"BMR target {target:.4g} is outside the fitted curve range "
+            f"[{lo:.4g}, {hi:.4g}] (bottom={c:.4g}, top={d:.4g}, bmr={bmr}). "
+            f"Reduce bmr or check the fitted model."
+        )
 
     # Point estimate
     if fit_result.model == "LL.4":

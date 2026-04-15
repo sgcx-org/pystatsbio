@@ -23,12 +23,13 @@ Validates against: R ``PKNCA::pk.nca()``, ``NonCompart::sNCA()``.
 
 from __future__ import annotations
 
+import contextlib
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import stats
 
 from pystatsbio.pk._common import NCAResult
-
 
 # ---------------------------------------------------------------------------
 # Input validation
@@ -206,12 +207,21 @@ def _find_last_measurable(concentration: NDArray[np.float64]) -> int:
     return int(nonzero[-1])
 
 
+class LambdaZEstimationError(ValueError):
+    """Raised when the terminal elimination rate constant cannot be estimated.
+
+    This is not a programming error — it signals that the concentration-time
+    profile does not contain enough terminal phase data to fit a reliable
+    log-linear slope.
+    """
+
+
 def _estimate_lambda_z(
     time: NDArray[np.float64],
     concentration: NDArray[np.float64],
     n_points: int | None,
     idx_cmax: int,
-) -> tuple[float | None, float | None, int]:
+) -> tuple[float, float, int]:
     """Estimate terminal elimination rate constant via log-linear regression.
 
     Selects terminal phase points (after Cmax, with positive concentration)
@@ -227,14 +237,22 @@ def _estimate_lambda_z(
 
     Returns
     -------
-    lambda_z : terminal rate constant (positive), or None if not estimable
-    r_squared_adj : adjusted R-squared of the best fit, or None
+    lambda_z : terminal rate constant (positive)
+    r_squared_adj : adjusted R-squared of the best fit
     n_terminal : number of points used
+
+    Raises
+    ------
+    LambdaZEstimationError
+        If there are insufficient terminal phase points or the fitted slope
+        is non-negative (not a true elimination phase).
     """
     # Terminal phase candidates: after Cmax, positive concentration
     idx_last = _find_last_measurable(concentration)
     if idx_last < 0:
-        return None, None, 0
+        raise LambdaZEstimationError(
+            "Cannot estimate lambda_z: all concentrations are zero."
+        )
 
     # Candidates: indices from Cmax+1 to last measurable (inclusive)
     candidates = []
@@ -251,11 +269,13 @@ def _estimate_lambda_z(
         if len(candidates_with_cmax) >= 3:
             candidates = candidates_with_cmax
         else:
-            return None, None, 0
+            raise LambdaZEstimationError(
+                f"Cannot estimate lambda_z: only {len(candidates_with_cmax)} "
+                f"positive concentration point(s) available after Cmax "
+                f"(need at least 3)."
+            )
 
     candidates = np.array(candidates)
-    t_term = time[candidates]
-    log_c_term = np.log(concentration[candidates])
 
     if n_points is not None:
         # Fixed number of terminal points (from the end)
@@ -269,14 +289,11 @@ def _estimate_lambda_z(
         idx_use = candidates[-n_points:]
         t_fit = time[idx_use]
         log_c_fit = np.log(concentration[idx_use])
-        slope, intercept, r_value, _, _ = stats.linregress(t_fit, log_c_fit)
+        slope, _, r_value, _, _ = stats.linregress(t_fit, log_c_fit)
         n_fit = n_points
         # Adjusted R-squared
         r_sq = r_value ** 2
-        if n_fit > 2:
-            r_sq_adj = 1.0 - (1.0 - r_sq) * (n_fit - 1) / (n_fit - 2)
-        else:
-            r_sq_adj = r_sq
+        r_sq_adj = 1.0 - (1.0 - r_sq) * (n_fit - 1) / (n_fit - 2) if n_fit > 2 else r_sq
     else:
         # Auto-select: try 3 to len(candidates) points from the end,
         # pick the one with best adjusted R-squared
@@ -288,16 +305,13 @@ def _estimate_lambda_z(
             idx_use = candidates[-n_try:]
             t_fit = time[idx_use]
             log_c_fit = np.log(concentration[idx_use])
-            slope, intercept, r_value, _, _ = stats.linregress(
-                t_fit, log_c_fit
-            )
+            s, _, r_value, _, _ = stats.linregress(t_fit, log_c_fit)
             r_sq = r_value ** 2
-            n_fit = n_try
-            r_sq_adj = 1.0 - (1.0 - r_sq) * (n_fit - 1) / (n_fit - 2)
+            r_sq_adj_try = 1.0 - (1.0 - r_sq) * (n_try - 1) / (n_try - 2)
 
-            if r_sq_adj > best_r_sq_adj:
-                best_r_sq_adj = r_sq_adj
-                best_slope = slope
+            if r_sq_adj_try > best_r_sq_adj:
+                best_r_sq_adj = r_sq_adj_try
+                best_slope = s
                 best_n = n_try
 
         slope = best_slope
@@ -306,7 +320,11 @@ def _estimate_lambda_z(
 
     # lambda_z must be positive (slope should be negative for elimination)
     if slope is None or slope >= 0:
-        return None, None, 0
+        raise LambdaZEstimationError(
+            f"Cannot estimate lambda_z: terminal slope is {slope} (non-negative). "
+            f"The concentration profile does not show a true elimination phase "
+            f"in the selected terminal points."
+        )
 
     lambda_z = -slope
     return lambda_z, r_sq_adj, n_fit
@@ -413,14 +431,14 @@ def nca(
     auc_segments = _compute_auc_segments(t_auc, c_auc, auc_method)
     auc_last = float(np.sum(auc_segments))
 
-    # ----- AUMC to last -----
-    aumc_segments = _compute_aumc_segments(t_auc, c_auc, auc_method)
-    aumc_last = float(np.sum(aumc_segments))
-
     # ----- Terminal elimination -----
-    lambda_z, r_sq_adj, n_terminal = _estimate_lambda_z(
-        time, concentration, lambda_z_n_points, idx_cmax
-    )
+    lambda_z: float | None = None
+    r_sq_adj: float | None = None
+    n_terminal = 0
+    with contextlib.suppress(LambdaZEstimationError):
+        lambda_z, r_sq_adj, n_terminal = _estimate_lambda_z(
+            time, concentration, lambda_z_n_points, idx_cmax
+        )
 
     # ----- Extrapolated AUC and AUMC -----
     auc_inf: float | None = None
@@ -432,15 +450,11 @@ def nca(
     if lambda_z is not None and lambda_z > 0:
         half_life = np.log(2) / lambda_z
         c_last = concentration[idx_last]
-        t_last = time[idx_last]
 
         # AUC extrapolation: Clast / lambda_z
         auc_extrap = c_last / lambda_z
         auc_inf = auc_last + auc_extrap
-        if auc_inf > 0:
-            auc_pct_extrap = 100.0 * auc_extrap / auc_inf
-        else:
-            auc_pct_extrap = 0.0
+        auc_pct_extrap = 100.0 * auc_extrap / auc_inf if auc_inf > 0 else 0.0
 
         # Dose-dependent parameters
         if dose is not None and auc_inf > 0:

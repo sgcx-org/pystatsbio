@@ -12,7 +12,6 @@ from scipy.stats import ncf
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 
-
 # ---------------------------------------------------------------------------
 # Internal power computation
 # ---------------------------------------------------------------------------
@@ -234,7 +233,9 @@ def power_anova_factorial(
             )
         df_num = n_levels[factor_idx] - 1
     else:
-        raise ValueError(f"effect must be 'interaction' or 'main_A', 'main_B', etc., got {effect!r}")
+        raise ValueError(
+            f"effect must be 'interaction' or 'main_A', 'main_B', etc., got {effect!r}"
+        )
 
     solve_for = _check_power_args(n=n, effect=f, power=power, alpha=alpha, effect_name="f")
 

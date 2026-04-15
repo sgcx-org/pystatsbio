@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.doseresponse import ll4, fit_drm, fit_drm_batch
-
+from pystatsbio.doseresponse import fit_drm, fit_drm_batch, ll4
 
 # ---------------------------------------------------------------------------
 # Fixtures

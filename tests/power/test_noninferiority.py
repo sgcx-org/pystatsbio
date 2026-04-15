@@ -3,9 +3,9 @@
 import pytest
 
 from pystatsbio.power import (
+    power_equiv_mean,
     power_noninf_mean,
     power_noninf_prop,
-    power_equiv_mean,
     power_superiority_mean,
 )
 

@@ -1,10 +1,9 @@
 """Tests for power_t_test and power_paired_t_test."""
 
-import math
 
 import pytest
 
-from pystatsbio.power import power_t_test, power_paired_t_test
+from pystatsbio.power import power_paired_t_test, power_t_test
 
 
 class TestPowerTTestSolveN:

@@ -93,9 +93,11 @@ class DiagnosticResult:
             "=" * 40,
             f"Cutoff        : {self.cutoff:.4g}",
             f"Sensitivity   : {self.sensitivity:.4f}  "
-            f"({self.conf_level:.0%} CI: {self.sensitivity_ci[0]:.4f}–{self.sensitivity_ci[1]:.4f})",
+            f"({self.conf_level:.0%} CI: "
+            f"{self.sensitivity_ci[0]:.4f}–{self.sensitivity_ci[1]:.4f})",
             f"Specificity   : {self.specificity:.4f}  "
-            f"({self.conf_level:.0%} CI: {self.specificity_ci[0]:.4f}–{self.specificity_ci[1]:.4f})",
+            f"({self.conf_level:.0%} CI: "
+            f"{self.specificity_ci[0]:.4f}–{self.specificity_ci[1]:.4f})",
             f"PPV           : {self.ppv:.4f}",
             f"NPV           : {self.npv:.4f}",
             f"LR+           : {self.lr_positive:.4f}",

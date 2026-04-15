@@ -24,7 +24,6 @@ from scipy import stats
 
 from pystatsbio.diagnostic._common import ROCResult
 
-
 # ---------------------------------------------------------------------------
 # ROCTestResult
 # ---------------------------------------------------------------------------

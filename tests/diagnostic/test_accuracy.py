@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import diagnostic_accuracy, DiagnosticResult
+from pystatsbio.diagnostic import DiagnosticResult, diagnostic_accuracy
 
 
 @pytest.fixture

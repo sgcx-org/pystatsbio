@@ -10,9 +10,10 @@ Validates against: R packages PKNCA, NonCompart.
 """
 
 from pystatsbio.pk._common import NCAResult
-from pystatsbio.pk._nca import nca
+from pystatsbio.pk._nca import LambdaZEstimationError, nca
 
 __all__ = [
     "NCAResult",
+    "LambdaZEstimationError",
     "nca",
 ]

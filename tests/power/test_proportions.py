@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from pystatsbio.power import power_prop_test, power_fisher_test
+from pystatsbio.power import power_fisher_test, power_prop_test
 
 
 class TestPowerPropTest:

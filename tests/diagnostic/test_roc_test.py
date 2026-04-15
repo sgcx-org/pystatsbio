@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import roc, roc_test, ROCTestResult
+from pystatsbio.diagnostic import ROCTestResult, roc, roc_test
 
 
 @pytest.fixture

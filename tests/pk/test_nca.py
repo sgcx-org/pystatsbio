@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.pk import nca, NCAResult
-
+from pystatsbio.pk import NCAResult, nca
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic PK profiles

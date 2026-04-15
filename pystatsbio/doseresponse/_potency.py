@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.stats import norm
 
 from pystatsbio.doseresponse._common import DoseResponseResult
@@ -86,8 +85,8 @@ def ec50(
 
     z = norm.ppf(1.0 - (1.0 - conf_level) / 2.0)
 
-    # CI on log scale (EC50 is always positive)
-    if ec50_val > 0 and se_ec50 > 0 and not np.isnan(se_ec50):
+    # CI on log scale (EC50 is always positive and finite)
+    if ec50_val > 0 and np.isfinite(ec50_val) and se_ec50 > 0 and not np.isnan(se_ec50):
         se_log = se_ec50 / ec50_val  # delta method: se(log(x)) ≈ se(x)/x
         log_ec50 = np.log(ec50_val)
         ci_lower = float(np.exp(log_ec50 - z * se_log))

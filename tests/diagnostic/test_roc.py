@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import roc, ROCResult
-
+from pystatsbio.diagnostic import ROCResult, roc
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -84,17 +84,14 @@ def _check_power_args(
     if not (0.0 < alpha < 1.0):
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
 
-    if n is not None:
-        if n < 2:
-            raise ValueError(f"n must be >= 2, got {n}")
+    if n is not None and n < 2:
+        raise ValueError(f"n must be >= 2, got {n}")
 
-    if power is not None:
-        if not (0.0 < power < 1.0):
-            raise ValueError(f"power must be in (0, 1), got {power}")
+    if power is not None and not (0.0 < power < 1.0):
+        raise ValueError(f"power must be in (0, 1), got {power}")
 
-    if effect is not None:
-        if not math.isfinite(effect):
-            raise ValueError(f"{effect_name} must be finite, got {effect}")
+    if effect is not None and not math.isfinite(effect):
+        raise ValueError(f"{effect_name} must be finite, got {effect}")
 
     if n is None:
         return "n"

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.doseresponse import ll4, ll5, weibull1, weibull2, brain_cousens
+from pystatsbio.doseresponse import brain_cousens, ll4, ll5, weibull1, weibull2
 
 
 class TestLL4:

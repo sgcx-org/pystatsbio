@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.doseresponse import ll4, ll5, weibull1, weibull2, fit_drm
-
+from pystatsbio.doseresponse import fit_drm, ll4, weibull1, weibull2
 
 # ---------------------------------------------------------------------------
 # Fixtures

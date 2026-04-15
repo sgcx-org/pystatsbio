@@ -18,7 +18,6 @@ from scipy.optimize import least_squares
 from pystatsbio.doseresponse._common import CurveParams, DoseResponseResult
 from pystatsbio.doseresponse._models import _MODEL_MAP, VALID_MODELS
 
-
 # ---------------------------------------------------------------------------
 # Self-starting parameter estimation
 # ---------------------------------------------------------------------------
@@ -282,7 +281,7 @@ def fit_drm(
 
     # --- Residual function ---
     def residuals(p: NDArray) -> NDArray:
-        kwargs = dict(zip(param_names, p))
+        kwargs = dict(zip(param_names, p, strict=True))
         pred = model_func(dose, **kwargs)
         r = response - pred
         if weights is not None:

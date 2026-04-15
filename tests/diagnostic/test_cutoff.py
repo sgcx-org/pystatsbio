@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import roc, optimal_cutoff, CutoffResult
+from pystatsbio.diagnostic import CutoffResult, optimal_cutoff, roc
 
 
 @pytest.fixture

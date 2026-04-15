@@ -12,7 +12,6 @@ import math
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 from pystatsbio.power._means import _t_test_power
 
-
 # ---------------------------------------------------------------------------
 # Internal power computation
 # ---------------------------------------------------------------------------

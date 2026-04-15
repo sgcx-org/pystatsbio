@@ -9,14 +9,11 @@ Usage:
     from pystatsbio import power, doseresponse, diagnostic, pk
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Hai-Shuo"
 __email__ = "contact@sgcx.org"
 
-from pystatsbio import power
-from pystatsbio import doseresponse
-from pystatsbio import diagnostic
-from pystatsbio import pk
+from pystatsbio import diagnostic, doseresponse, pk, power
 
 __all__ = [
     "__version__",

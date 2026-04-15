@@ -17,11 +17,10 @@ Validates against: R drc::LL.4(), LL.5(), W1.4(), W2.4(), BC.5()
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 from numpy.typing import NDArray
-
 
 # ---------------------------------------------------------------------------
 # Safe log-dose utility
