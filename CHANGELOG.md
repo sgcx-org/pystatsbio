@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+### batch_auc GPU — Fully Vectorized (49-63x speedup on CUDA)
+
+Linux/NVIDIA validation on RTX 5070 Ti revealed that the GPU `batch_auc`
+backend was **slower than CPU** due to sequential Python `for`/`while` loops
+for tie detection. This release replaces the entire ranking kernel.
+
+#### Changed
+
+- **`batch_auc(backend='gpu')`**: Replaced sequential per-marker Python loops
+  with fully vectorized tie detection using `diff` + `cumsum` for group IDs
+  and `scatter_add_` for midrank computation. Zero Python loops touch GPU
+  tensors.
+- **Benchmarks** (RTX 5070 Ti, 1,155 TCGA BRCA samples):
+  - 1,000 markers: 63x speedup (CPU 0.18s, GPU 0.003s)
+  - 5,000 markers: 63x speedup (CPU 0.92s, GPU 0.015s)
+  - 20,000 markers: 49x speedup (CPU 3.6s, GPU 0.074s)
+  - Previous: GPU was 2-5x *slower* than CPU at all scales
+
+#### MPS (Apple Silicon) — Fail Fast
+
+- **`batch_auc(backend='gpu')` on MPS now raises `RuntimeError`** instead of
+  silently running ~1000x slower than CPU. Metal's `scatter_add_` does not
+  handle the sparse scatter pattern used by the vectorized midrank kernel
+  efficiently (tested at 1350x slower on M2 Ultra with 5K markers).
+- `backend='auto'` on Apple Silicon now correctly routes to CPU.
+- `backend='gpu'` on Apple Silicon fails loud with an actionable error message.
+
+#### Dose-response improvements (Mac session)
+
+- *(Changes from Mac session — to be detailed by that session)*
+
 ## 1.0.1
 
 Bug fixes to match R reference implementations.
