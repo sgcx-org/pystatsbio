@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.1
+
+Bug fixes to match R reference implementations.
+
+### Fixed
+
+- **`power_crossover_be`**: TOST alpha convention now matches R PowerTOST — `alpha`
+  is the per-test significance level (each one-sided test at `alpha`, producing a
+  `1 − 2α` confidence interval). Previously `alpha` was incorrectly split as
+  `alpha/2` per test, resulting in overly conservative sample sizes.
+
+- **`roc` DeLong CI**: AUC confidence interval now uses the normal (Wald) interval
+  on the original scale, matching R pROC `ci.auc(method="delong")`. Previously used
+  a logit-transformed interval.
+
+- **`ec50` CI**: Confidence interval now uses the t-distribution with residual
+  degrees of freedom on the raw scale, matching R drc `ED(interval="delta")`.
+  Previously used the normal distribution on the log scale.
+
 ## 1.0.0
 
 Initial release.

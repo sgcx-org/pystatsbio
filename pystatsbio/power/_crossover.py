@@ -39,7 +39,10 @@ def _crossover_be_power(
     theta1, theta2 : float
         Lower and upper bioequivalence limits.
     alpha : float
-        Overall significance level (each one-sided test at alpha/2).
+        Per-test significance level for TOST.  Each one-sided test is
+        conducted at ``alpha``, producing a ``1 - 2*alpha`` confidence
+        interval (e.g., alpha=0.05 → 90 % CI).  This matches the FDA
+        convention and R's PowerTOST package.
     """
     # Within-subject SD on log-scale
     sigma_w = math.sqrt(math.log(1.0 + cv ** 2))
@@ -52,8 +55,9 @@ def _crossover_be_power(
     if df < 1.0:
         return 0.0
 
-    # Critical t-value (each one-sided test at alpha/2)
-    t_crit = t_dist.ppf(1.0 - alpha / 2.0, df)
+    # Critical t-value — each one-sided test at alpha (not alpha/2).
+    # TOST alpha IS the per-test level; the overall CI is 1 - 2*alpha.
+    t_crit = t_dist.ppf(1.0 - alpha, df)
 
     # Log-ratios
     ln_theta0 = math.log(theta0)
@@ -70,7 +74,7 @@ def _crossover_be_power(
     # Combined via the intersection: power_lower + power_upper - 1
     if df > 1e5:
         # Normal approximation for very large df
-        z_crit = norm.ppf(1.0 - alpha / 2.0)
+        z_crit = norm.ppf(1.0 - alpha)
         power_lower = float(norm.sf(z_crit - ncp_lower))
         power_upper = float(norm.sf(z_crit - ncp_upper))
     else:
@@ -79,10 +83,10 @@ def _crossover_be_power(
 
         # scipy nct can return NaN for moderate-to-large ncp; fall back to normal
         if math.isnan(power_lower):
-            z_crit = norm.ppf(1.0 - alpha / 2.0)
+            z_crit = norm.ppf(1.0 - alpha)
             power_lower = float(norm.sf(z_crit - ncp_lower))
         if math.isnan(power_upper):
-            z_crit = norm.ppf(1.0 - alpha / 2.0)
+            z_crit = norm.ppf(1.0 - alpha)
             power_upper = float(norm.sf(z_crit - ncp_upper))
 
     pwr = power_lower + power_upper - 1.0
@@ -121,7 +125,9 @@ def power_crossover_be(
     theta0 : float
         Assumed true ratio of geometric means (default 0.95).
     alpha : float
-        Significance level for TOST (default 0.05, i.e. two one-sided 0.025).
+        Per-test significance level for TOST (default 0.05).  Each
+        one-sided test is at ``alpha``, giving a ``1 - 2*alpha`` = 90 % CI.
+        Matches R PowerTOST and FDA convention.
     power : float or None
         Desired power.
 
@@ -133,7 +139,7 @@ def power_crossover_be(
     --------
     >>> r = power_crossover_be(cv=0.30, power=0.80)
     >>> r.n  # total subjects
-    40
+    36
 
     Validates against: R PowerTOST::sampleN.TOST(), PowerTOST::power.TOST()
     """

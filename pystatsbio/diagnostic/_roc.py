@@ -153,24 +153,18 @@ def _delong_variance(
     return S10 / n1 + S01 / n0
 
 
-def _logit_ci(
+def _delong_ci(
     auc: float, var_auc: float, conf_level: float,
 ) -> tuple[float, float]:
-    """AUC confidence interval on logit scale (matching pROC default)."""
+    """AUC confidence interval using DeLong normal approximation.
+
+    Matches R pROC::ci.auc(method="delong"): symmetric Wald CI on the
+    original AUC scale, clamped to [0, 1].
+    """
     z = stats.norm.ppf((1 + conf_level) / 2)
-
-    # Clamp AUC away from 0/1 to avoid log(0)
-    auc_c = np.clip(auc, 1e-10, 1.0 - 1e-10)
-
-    logit_auc = np.log(auc_c / (1.0 - auc_c))
-    se_logit = np.sqrt(var_auc) / (auc_c * (1.0 - auc_c))
-
-    logit_lo = logit_auc - z * se_logit
-    logit_hi = logit_auc + z * se_logit
-
-    ci_lo = 1.0 / (1.0 + np.exp(-logit_lo))
-    ci_hi = 1.0 / (1.0 + np.exp(-logit_hi))
-
+    se = np.sqrt(var_auc)
+    ci_lo = max(0.0, auc - z * se)
+    ci_hi = min(1.0, auc + z * se)
     return float(ci_lo), float(ci_hi)
 
 
@@ -223,7 +217,7 @@ def roc(
     # DeLong SE and CI
     var_auc = _delong_variance(auc_val, V10, V01, n1, n0)
     se_auc = float(np.sqrt(var_auc))
-    ci_lo, ci_hi = _logit_ci(auc_val, var_auc, conf_level)
+    ci_lo, ci_hi = _delong_ci(auc_val, var_auc, conf_level)
 
     # Build empirical ROC curve (thresholds, TPR, FPR)
     thresholds, tpr, fpr = _empirical_roc_curve(

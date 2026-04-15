@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.stats import norm
+from scipy.stats import t as t_dist
 
 from pystatsbio.doseresponse._common import DoseResponseResult
 from pystatsbio.doseresponse._models import _MODEL_MAP
@@ -83,14 +84,19 @@ def ec50(
     ec50_val = fit_result.params.ec50
     se_ec50 = float(fit_result.se[ec50_idx])
 
-    z = norm.ppf(1.0 - (1.0 - conf_level) / 2.0)
+    # Use t-distribution with residual df on the raw scale,
+    # matching R drc::ED(interval="delta")
+    n_params = len(fit_result.se)
+    df_resid = fit_result.n_obs - n_params
+    if df_resid > 0:
+        t_crit = t_dist.ppf(1.0 - (1.0 - conf_level) / 2.0, df_resid)
+    else:
+        t_crit = norm.ppf(1.0 - (1.0 - conf_level) / 2.0)
 
-    # CI on log scale (EC50 is always positive and finite)
+    # Raw-scale CI: estimate ± t * SE
     if ec50_val > 0 and np.isfinite(ec50_val) and se_ec50 > 0 and not np.isnan(se_ec50):
-        se_log = se_ec50 / ec50_val  # delta method: se(log(x)) ≈ se(x)/x
-        log_ec50 = np.log(ec50_val)
-        ci_lower = float(np.exp(log_ec50 - z * se_log))
-        ci_upper = float(np.exp(log_ec50 + z * se_log))
+        ci_lower = float(ec50_val - t_crit * se_ec50)
+        ci_upper = float(ec50_val + t_crit * se_ec50)
     else:
         ci_lower = float("nan")
         ci_upper = float("nan")
