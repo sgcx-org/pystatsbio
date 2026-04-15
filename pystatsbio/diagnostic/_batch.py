@@ -92,7 +92,15 @@ def _batch_auc_gpu(
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        device = torch.device("mps")
+        # MPS scatter_add_ is catastrophically slow for the midrank
+        # computation (1350× slower than CPU on 5K markers).  Metal's
+        # GPU does not handle sparse scatter patterns efficiently.
+        # Fail fast rather than silently delivering a 15-minute wait.
+        raise RuntimeError(
+            "batch_auc GPU backend is not supported on MPS (Apple Silicon). "
+            "MPS scatter_add_ is ~1000× slower than CPU for this workload. "
+            "Use backend='cpu' instead."
+        )
     else:
         device = torch.device("cpu")
 
@@ -272,14 +280,12 @@ def batch_auc(
     if backend == "gpu":
         return _batch_auc_gpu(response, predictors)
 
-    # auto — try GPU, fall back to CPU
+    # auto — use CUDA GPU if available, otherwise CPU.
+    # MPS is excluded: scatter_add_ is catastrophically slow on Metal.
     try:
         import torch
 
-        has_gpu = torch.cuda.is_available() or (
-            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-        )
-        if has_gpu:
+        if torch.cuda.is_available():
             return _batch_auc_gpu(response, predictors)
     except ImportError:
         pass

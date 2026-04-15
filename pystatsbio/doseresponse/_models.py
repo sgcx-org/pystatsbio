@@ -21,10 +21,16 @@ from collections.abc import Callable
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.special import expit as _scipy_expit
 
 # ---------------------------------------------------------------------------
 # Safe log-dose utility
 # ---------------------------------------------------------------------------
+
+def _expit_neg(z: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Compute 1/(1+exp(z)) = expit(-z) — branchless and overflow-safe."""
+    return _scipy_expit(-z)
+
 
 def _safe_log_dose(dose: NDArray[np.floating]) -> NDArray[np.floating]:
     """Compute log(dose) with dose=0 mapped to -inf (IEEE 754 compliant).
@@ -225,6 +231,57 @@ def brain_cousens(
     log_ec50 = np.log(ec50)
     exponent = -hill * (log_dose - log_ec50)
     return bottom + (top - bottom + hormesis * dose) / (1.0 + np.exp(exponent))
+
+
+# ---------------------------------------------------------------------------
+# Analytical Jacobians for the log(ec50) reparameterization
+#
+# When fitting, we optimise θ = [bottom, top, log_ec50, hill] so that
+# EC50 = exp(log_ec50) is automatically positive (no bounds needed).
+# Each function returns ∂r/∂θ where r = y − f, shape (N, n_params).
+# ---------------------------------------------------------------------------
+
+def _jac_ll4_log(
+    dose: NDArray[np.floating],
+    params: NDArray[np.floating],
+) -> NDArray[np.floating]:
+    """Analytical residual Jacobian for LL.4 in log(ec50) parameterisation.
+
+    Parameters are [bottom, top, log_ec50, hill].
+    Returns shape (N, 4) = ∂(y − f)/∂θ = −∂f/∂θ.
+
+    Optimised: pre-allocated output, no column_stack, stable expit
+    via scipy.special.expit.
+    """
+    bottom, top, log_ec50, hill = params
+    N = len(dose)
+    log_dose = _safe_log_dose(dose)
+    w = log_dose - log_ec50          # ln(x) − ln(e)
+    z = -hill * w                     # exponent in sigmoid
+
+    # s = 1/(1+exp(z)) = expit(-z)  — scipy's expit is branchless & safe
+    s = _expit_neg(z)
+    s1s = s * (1.0 - s)
+    span = top - bottom
+
+    jac = np.empty((N, 4))
+    jac[:, 0] = s - 1.0              # −∂f/∂bottom = −(1−s)
+    jac[:, 1] = -s                    # −∂f/∂top = −s
+    jac[:, 2] = span * s1s * hill     # −∂f/∂log_ec50
+    jac[:, 3] = -span * s1s * w       # −∂f/∂hill
+
+    # dose = 0 → w = −inf → s*(1−s) = 0; clear any NaN from 0 * inf
+    inf_mask = ~np.isfinite(w)
+    if np.any(inf_mask):
+        jac[inf_mask, 2] = 0.0
+        jac[inf_mask, 3] = 0.0
+
+    return jac
+
+
+_JAC_LOG_MAP: dict[str, Callable] = {
+    "LL.4": _jac_ll4_log,
+}
 
 
 # ---------------------------------------------------------------------------

@@ -87,12 +87,21 @@ class TestBatchCPU:
 # GPU batch
 # ---------------------------------------------------------------------------
 
+def _has_cuda() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
 class TestBatchGPU:
-    """GPU batch AUC."""
+    """GPU batch AUC (CUDA only — MPS scatter_add_ is too slow)."""
 
     @pytest.fixture(autouse=True)
-    def requires_torch(self):
-        pytest.importorskip("torch")
+    def requires_cuda(self):
+        if not _has_cuda():
+            pytest.skip("batch_auc GPU requires CUDA (MPS not supported)")
 
     def test_gpu_runs(self, batch_data):
         response, predictors = batch_data
@@ -112,6 +121,18 @@ class TestBatchGPU:
         r = batch_auc(response, predictors, backend="gpu")
         assert np.all(r.auc >= 0)
         assert np.all(r.auc <= 1)
+
+
+class TestBatchMPSRejected:
+    """MPS should raise RuntimeError, not silently crawl."""
+
+    def test_mps_raises(self, batch_data):
+        torch = pytest.importorskip("torch")
+        if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+            pytest.skip("MPS not available")
+        response, predictors = batch_data
+        with pytest.raises(RuntimeError, match="not supported on MPS"):
+            batch_auc(response, predictors, backend="gpu")
 
 
 # ---------------------------------------------------------------------------
