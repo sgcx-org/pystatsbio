@@ -29,9 +29,50 @@ for tie detection. This release replaces the entire ranking kernel.
 - `backend='auto'` on Apple Silicon now correctly routes to CPU.
 - `backend='gpu'` on Apple Silicon fails loud with an actionable error message.
 
-#### Dose-response improvements (Mac session)
+### Dose-response CPU speed — 3.3x faster than R
 
-- *(Changes from Mac session — to be detailed by that session)*
+Profiling revealed pystatsbio's CPU dose-response fitting was **8x slower
+than R's drc** (19 cmpd/s vs 112 cmpd/s) due to scipy's Python-level TRF
+loop and numerical finite differences.  Three changes close the gap:
+
+#### Changed
+
+- **MINPACK Fortran LM optimizer**: `fit_drm` now uses `method='lm'`
+  (MINPACK `lmder` Fortran routine) instead of `method='trf'`.  The entire
+  Levenberg-Marquardt iteration loop runs in compiled Fortran, eliminating
+  Python-level overhead (~150 iterations × function call overhead per fit).
+
+- **Analytical Jacobian for LL.4**: Closed-form derivatives replace
+  2-point numerical finite differences.  Eliminates 4x redundant function
+  evaluations per Jacobian computation.  Uses `scipy.special.expit` for
+  numerically stable sigmoid.
+
+- **log(ec50) reparameterization**: Fits `log(ec50)` instead of `ec50`,
+  removing the positivity bound (`ec50 > 0` is automatic via `exp`).
+  This enables `method='lm'` which does not support bounds.  Jacobian
+  column transformed back to natural scale for correct SE computation.
+
+- **Fail-fast on hopeless data**: `max_nfev=200` for the LM path.
+  Converged fits use ~20-50 evaluations; if 200 isn't enough, the data
+  has no dose-response signal.  Prevents burning 2000 evaluations on
+  flat/inactive compounds.  Falls back to TRF only when custom bounds or
+  weights are explicitly requested.
+
+- **Benchmarks** (Tox21 AID 743083, 8,358 compounds × 8 doses):
+  - Before: 433s (19 cmpd/s) — 5.8x slower than R
+  - After: 22.6s (369 cmpd/s) — **3.3x faster than R**
+  - R drc: 74.6s (112 cmpd/s)
+  - EC50 correlation vs R on active compounds: 0.978
+
+### Bug fixes (from 1.0.1, now included)
+
+- **`power_crossover_be`**: TOST alpha convention now matches R PowerTOST.
+
+- **`roc` DeLong CI**: Uses normal (Wald) interval on original scale,
+  matching R pROC `ci.auc(method="delong")`.
+
+- **`ec50` CI**: Uses t-distribution with residual df on raw scale,
+  matching R drc `ED(interval="delta")`.
 
 ## 1.0.1
 
