@@ -1,0 +1,849 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="#"><link rel="search" title="Search" href="search.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 --><title>Index - PyStatsBio API Reference</title>
+<link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=ce2f82e3" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  --color-brand-primary: #27ae60;
+  --color-brand-content: #1a7a3a;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #2ecc71;
+  --color-brand-content: #27ae60;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #2ecc71;
+  --color-brand-content: #27ae60;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     <a href="https://sgcx.org/technology/pystatsbio/">← Back to PyStatsBio overview on sgcx.org</a> 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">PyStatsBio API Reference</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">PyStatsBio API Reference</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Modules</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="power.html">Power Analysis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="doseresponse.html">Dose-Response Modeling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="diagnostic.html">Diagnostic Accuracy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pk.html">Pharmacokinetics</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          
+<section class="genindex-section">
+  <h1 id="index">Index</h1>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#B"><strong>B</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#J"><strong>J</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#V"><strong>V</strong></a> | <a href="#W"><strong>W</strong></a></div>
+</section>
+<section id="A" class="genindex-section">
+  <h2>A</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.aic">aic (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult.alpha">alpha (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult.alternative">alternative (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.asymmetry">asymmetry (pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.BatchAUCResult.auc">auc (pystatsbio.diagnostic.BatchAUCResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#id3">(pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.auc">[1]</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.auc1">auc1 (pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.auc2">auc2 (pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.auc_ci_lower">auc_ci_lower (pystatsbio.diagnostic.ROCResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.auc_ci_upper">auc_ci_upper (pystatsbio.diagnostic.ROCResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.auc_diff">auc_diff (pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.auc_inf">auc_inf (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.auc_last">auc_last (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.auc_method">auc_method (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.auc_pct_extrap">auc_pct_extrap (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#id4">auc_se (pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.auc_se">[1]</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="B" class="genindex-section">
+  <h2>B</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.batch_auc">batch_auc() (in module pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.BatchAUCResult">BatchAUCResult (class in pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult">BatchDoseResponseResult (class in pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.bic">bic (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.bmd">bmd (pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.bmd">bmd() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.bmdl">bmdl (pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult">BMDResult (class in pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.bmdu">bmdu (pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.bmr">bmr (pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.bottom">bottom (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.bottom">(pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.brain_cousens">brain_cousens() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="C" class="genindex-section">
+  <h2>C</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.ci_lower">ci_lower (pystatsbio.doseresponse.EC50Result attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult.ci_lower">(pystatsbio.doseresponse.RelativePotencyResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.ci_upper">ci_upper (pystatsbio.doseresponse.EC50Result attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult.ci_upper">(pystatsbio.doseresponse.RelativePotencyResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.clearance">clearance (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.cmax">cmax (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.conf_level">conf_level (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#id5">(pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.conf_level">[1]</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.conf_level">(pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.conf_level">(pystatsbio.doseresponse.EC50Result attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult.conf_level">(pystatsbio.doseresponse.RelativePotencyResult attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.converged">converged (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.converged">(pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult.criterion_value">criterion_value (pystatsbio.diagnostic.CutoffResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams">CurveParams (class in pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult.cutoff">cutoff (pystatsbio.diagnostic.CutoffResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.cutoff">(pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult">CutoffResult (class in pystatsbio.diagnostic)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="D" class="genindex-section">
+  <h2>D</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.diagnostic_accuracy">diagnostic_accuracy() (in module pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult">DiagnosticResult (class in pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="diagnostic.html#id6">direction (pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.direction">[1]</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.dor">dor (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.dor_ci">dor_ci (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.dose">dose (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="pk.html#pystatsbio.pk.NCAResult.dose">(pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult">DoseResponseResult (class in pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="E" class="genindex-section">
+  <h2>E</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.ec50">ec50 (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.ec50">(pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.ec50">ec50() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result">EC50Result (class in pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult.effect_size">effect_size (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.estimate">estimate (pystatsbio.doseresponse.EC50Result attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="F" class="genindex-section">
+  <h2>F</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.fit_drm">fit_drm() (in module pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.fit_drm_batch">fit_drm_batch() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#id2">fpr (pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.fpr">[1]</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.from_array">from_array() (pystatsbio.doseresponse.CurveParams static method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="H" class="genindex-section">
+  <h2>H</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.half_life">half_life (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.hill">hill (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.hill">(pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.hormesis">hormesis (pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="J" class="genindex-section">
+  <h2>J</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.jac">jac (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="L" class="genindex-section">
+  <h2>L</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.lambda_z">lambda_z (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.lambda_z_r_squared">lambda_z_r_squared (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.ll4">ll4() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.ll5">ll5() (in module pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.lr_negative">lr_negative (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.lr_positive">lr_positive (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="M" class="genindex-section">
+  <h2>M</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult.method">method (pystatsbio.diagnostic.CutoffResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.method">(pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.method">(pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.BMDResult.method">(pystatsbio.doseresponse.BMDResult attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.method">(pystatsbio.doseresponse.EC50Result attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult.method">(pystatsbio.doseresponse.RelativePotencyResult attribute)</a>
+</li>
+          <li><a href="power.html#pystatsbio.power.PowerResult.method">(pystatsbio.power.PowerResult attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.model">model (pystatsbio.doseresponse.CurveParams attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.model">(pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        </ul></li>
+        <li>
+    module
+
+        <ul>
+          <li><a href="diagnostic.html#module-pystatsbio.diagnostic">pystatsbio.diagnostic</a>
+</li>
+          <li><a href="doseresponse.html#module-pystatsbio.doseresponse">pystatsbio.doseresponse</a>
+</li>
+          <li><a href="pk.html#module-pystatsbio.pk">pystatsbio.pk</a>
+</li>
+          <li><a href="power.html#module-pystatsbio.power">pystatsbio.power</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="N" class="genindex-section">
+  <h2>N</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="power.html#pystatsbio.power.PowerResult.n">n (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.n_compounds">n_compounds (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.n_iter">n_iter (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.BatchAUCResult.n_markers">n_markers (pystatsbio.diagnostic.BatchAUCResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.n_negative">n_negative (pystatsbio.diagnostic.ROCResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.n_obs">n_obs (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.n_points">n_points (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.n_positive">n_positive (pystatsbio.diagnostic.ROCResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.n_terminal">n_terminal (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.nca">nca() (in module pystatsbio.pk)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult">NCAResult (class in pystatsbio.pk)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult.note">note (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.npv">npv (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="O" class="genindex-section">
+  <h2>O</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.optimal_cutoff">optimal_cutoff() (in module pystatsbio.diagnostic)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="P" class="genindex-section">
+  <h2>P</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.p_value">p_value (pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.params">params (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult.power">power (pystatsbio.power.PowerResult attribute)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_anova_factorial">power_anova_factorial() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_anova_oneway">power_anova_oneway() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_cluster">power_cluster() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_crossover_be">power_crossover_be() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_equiv_mean">power_equiv_mean() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_fisher_test">power_fisher_test() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_logrank">power_logrank() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_noninf_mean">power_noninf_mean() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_noninf_prop">power_noninf_prop() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_paired_t_test">power_paired_t_test() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_prop_test">power_prop_test() (in module pystatsbio.power)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="power.html#pystatsbio.power.power_superiority_mean">power_superiority_mean() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.power_t_test">power_t_test() (in module pystatsbio.power)</a>
+</li>
+        <li><a href="power.html#pystatsbio.power.PowerResult">PowerResult (class in pystatsbio.power)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.ppv">ppv (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.predict">predict() (pystatsbio.doseresponse.CurveParams method)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.predict">(pystatsbio.doseresponse.DoseResponseResult method)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.prevalence">prevalence (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li>
+    pystatsbio.diagnostic
+
+        <ul>
+          <li><a href="diagnostic.html#module-pystatsbio.diagnostic">module</a>
+</li>
+        </ul></li>
+        <li>
+    pystatsbio.doseresponse
+
+        <ul>
+          <li><a href="doseresponse.html#module-pystatsbio.doseresponse">module</a>
+</li>
+        </ul></li>
+        <li>
+    pystatsbio.pk
+
+        <ul>
+          <li><a href="pk.html#module-pystatsbio.pk">module</a>
+</li>
+        </ul></li>
+        <li>
+    pystatsbio.power
+
+        <ul>
+          <li><a href="power.html#module-pystatsbio.power">module</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="R" class="genindex-section">
+  <h2>R</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult.ratio">ratio (pystatsbio.doseresponse.RelativePotencyResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.relative_potency">relative_potency() (in module pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.RelativePotencyResult">RelativePotencyResult (class in pystatsbio.doseresponse)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.residuals">residuals (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.response">response (pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.roc">roc() (in module pystatsbio.diagnostic)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.roc_test">roc_test() (in module pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult">ROCResult (class in pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult">ROCTestResult (class in pystatsbio.diagnostic)</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.route">route (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.rss">rss (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.rss">(pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="S" class="genindex-section">
+  <h2>S</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.BatchAUCResult.se">se (pystatsbio.diagnostic.BatchAUCResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.se">(pystatsbio.doseresponse.DoseResponseResult attribute)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.EC50Result.se">(pystatsbio.doseresponse.EC50Result attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult.sensitivity">sensitivity (pystatsbio.diagnostic.CutoffResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.sensitivity">(pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.sensitivity_ci">sensitivity_ci (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.CutoffResult.specificity">specificity (pystatsbio.diagnostic.CutoffResult attribute)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.specificity">(pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        </ul></li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.specificity_ci">specificity_ci (pystatsbio.diagnostic.DiagnosticResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.statistic">statistic (pystatsbio.diagnostic.ROCTestResult attribute)</a>
+</li>
+        <li><a href="diagnostic.html#pystatsbio.diagnostic.DiagnosticResult.summary">summary() (pystatsbio.diagnostic.DiagnosticResult method)</a>
+
+        <ul>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.summary">(pystatsbio.diagnostic.ROCResult method)</a>
+</li>
+          <li><a href="diagnostic.html#pystatsbio.diagnostic.ROCTestResult.summary">(pystatsbio.diagnostic.ROCTestResult method)</a>
+</li>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.DoseResponseResult.summary">(pystatsbio.doseresponse.DoseResponseResult method)</a>
+</li>
+          <li><a href="pk.html#pystatsbio.pk.NCAResult.summary">(pystatsbio.pk.NCAResult method)</a>
+</li>
+          <li><a href="power.html#pystatsbio.power.PowerResult.summary">(pystatsbio.power.PowerResult method)</a>
+</li>
+        </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="T" class="genindex-section">
+  <h2>T</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="diagnostic.html#id0">thresholds (pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.thresholds">[1]</a>
+</li>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.tmax">tmax (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.to_array">to_array() (pystatsbio.doseresponse.CurveParams method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.BatchDoseResponseResult.top">top (pystatsbio.doseresponse.BatchDoseResponseResult attribute)</a>
+
+        <ul>
+          <li><a href="doseresponse.html#pystatsbio.doseresponse.CurveParams.top">(pystatsbio.doseresponse.CurveParams attribute)</a>
+</li>
+        </ul></li>
+        <li><a href="diagnostic.html#id1">tpr (pystatsbio.diagnostic.ROCResult attribute)</a>, <a href="diagnostic.html#pystatsbio.diagnostic.ROCResult.tpr">[1]</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="V" class="genindex-section">
+  <h2>V</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="pk.html#pystatsbio.pk.NCAResult.vz">vz (pystatsbio.pk.NCAResult attribute)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="W" class="genindex-section">
+  <h2>W</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.weibull1">weibull1() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="doseresponse.html#pystatsbio.doseresponse.weibull2">weibull2() (in module pystatsbio.doseresponse)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, SGCX
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=01f34227"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

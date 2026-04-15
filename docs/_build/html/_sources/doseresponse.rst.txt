@@ -1,0 +1,11 @@
+Dose-Response Modeling
+=====================
+
+4PL/5PL curve fitting, EC50/IC50 estimation, relative potency, and benchmark dose analysis. GPU-accelerated batch fitting for high-throughput screening (HTS).
+
+Validates against R packages: ``drc``, ``nplr``, ``BMDS``.
+
+.. automodule:: pystatsbio.doseresponse
+   :members:
+   :undoc-members:
+   :show-inheritance:
