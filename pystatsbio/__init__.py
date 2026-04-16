@@ -13,7 +13,7 @@ __version__ = "1.1.0"
 __author__ = "Hai-Shuo"
 __email__ = "contact@sgcx.org"
 
-from pystatsbio import diagnostic, doseresponse, pk, power
+from pystatsbio import diagnostic, doseresponse, epi, gee, meta, pk, power
 
 __all__ = [
     "__version__",
@@ -21,4 +21,7 @@ __all__ = [
     "doseresponse",
     "diagnostic",
     "pk",
+    "epi",
+    "meta",
+    "gee",
 ]
