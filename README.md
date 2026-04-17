@@ -4,8 +4,9 @@ Biotech and pharmaceutical statistical computing for Python.
 
 Built on [PyStatistics](https://github.com/sgcx-org/pystatistics) for the general statistical
 computing layer. PyStatsBio provides domain-specific methods for the drug development pipeline:
-dose-response modeling, sample size/power, diagnostic accuracy, and non-compartmental
-pharmacokinetics.
+dose-response modeling, sample size/power, diagnostic accuracy, non-compartmental
+pharmacokinetics, epidemiological measures, meta-analysis, and generalized estimating equations
+for clustered data.
 
 ---
 
@@ -150,6 +151,48 @@ print(result.half_life)
 print(result.cl, result.vd)
 print(result.aumc_last, result.mrt)
 print(result.summary())
+
+
+# --- Epidemiological measures ---
+from pystatsbio import epi
+
+# 2x2 table: exposed/unexposed x case/control
+table = np.array([[30, 70], [10, 90]])
+result = epi.epi_2x2(table)
+print(result.risk_ratio, result.odds_ratio, result.summary())
+
+# Mantel-Haenszel stratified analysis
+tables = np.array([[[30, 70], [10, 90]], [[20, 80], [15, 85]]])
+result = epi.mantel_haenszel(tables)
+print(result.common_or, result.p_value)
+
+
+# --- Meta-analysis ---
+from pystatsbio import meta
+
+effects = np.array([0.5, 0.3, 0.8, 0.6, 0.4])
+se = np.array([0.1, 0.15, 0.2, 0.12, 0.18])
+
+# Random-effects (DerSimonian-Laird)
+result = meta.meta_random(effects, se)
+print(result.pooled_effect, result.ci_lower, result.ci_upper)
+print(result.tau2, result.I2)
+print(result.summary())
+
+# Publication bias (Egger's test)
+bias = meta.funnel_test(effects, se)
+print(bias.p_value)
+
+
+# --- GEE (clustered data) ---
+from pystatsbio import gee
+
+y = np.random.randn(200)
+X = np.random.randn(200, 3)
+cluster_id = np.repeat(np.arange(40), 5)
+result = gee.gee(y, X, cluster_id, family='gaussian', corstr='exchangeable')
+print(result.coefficients, result.robust_se)
+print(result.summary())
 ```
 
 ---
@@ -162,6 +205,9 @@ print(result.summary())
 | `doseresponse/` | Complete | 4PL/5PL curve fitting, EC50, relative potency, BMD, batch HTS |
 | `diagnostic/` | Complete | ROC, AUC, sensitivity/specificity, optimal cutoff, batch biomarker |
 | `pk/` | Complete | Non-compartmental PK analysis (NCA): AUC, Cmax, CL, Vd, MRT |
+| `epi/` | Complete | Epidemiological measures: 2x2 tables, rate standardization, Mantel-Haenszel |
+| `meta/` | Complete | Meta-analysis: fixed/random effects, DerSimonian-Laird, REML |
+| `gee/` | Complete | Generalized estimating equations for clustered/longitudinal data |
 
 ### `power` — Sample Size and Power
 
@@ -212,6 +258,33 @@ Models: `LL.4` (4PL), `LL.5` (5PL), `W1.4` (Weibull-1), `W2.4` (Weibull-2),
 
 AUC methods: `linear`, `log`, `linear-up/log-down` (FDA default).
 Routes: `iv` (intravenous), `ev` (extravascular).
+
+### `epi` — Epidemiological Measures
+
+| Function | R equivalent |
+|----------|--------------|
+| `epi_2x2()` | `epiR::epi.2by2()` |
+| `rate_standardize()` | `epitools::ageadjust.direct()` / `ageadjust.indirect()` |
+| `mantel_haenszel()` | `stats::mantelhaen.test()` |
+
+### `meta` — Meta-Analysis
+
+| Function | R equivalent |
+|----------|--------------|
+| `meta_fixed()` | `meta::metagen(method="FE")` |
+| `meta_random()` | `meta::metagen(method="DL")` / `metafor::rma()` |
+| `meta_reml()` | `metafor::rma(method="REML")` |
+| `forest_data()` | `meta::forest()` (data extraction for plotting) |
+| `funnel_test()` | `metafor::regtest()` / `meta::metabias()` |
+
+### `gee` — Generalized Estimating Equations
+
+| Function | R equivalent |
+|----------|--------------|
+| `gee()` | `geepack::geeglm()` |
+
+Families: `gaussian`, `binomial`, `poisson`.
+Correlation structures: `independence`, `exchangeable`, `ar1`, `unstructured`.
 
 ---
 
