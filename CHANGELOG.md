@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.5.0
+
+### Summary
+
+Three new modules covering epidemiology, meta-analysis, and longitudinal data
+analysis. The `gee` module establishes the first real cross-package dependency
+on PyStatistics. Adds 190 new tests.
+
+### Added
+
+#### Epidemiology Module
+
+- **`epi_2by2(table)`** — RR, OR, RD, attributable fraction, PAF, NNT from 2×2
+  tables. Validates against R `epiR::epi.2by2()`.
+- **`rate_standardize(counts, person_time, standard_pop)`** — Direct and indirect
+  age-standardization. Validates against R `epitools`.
+- **`mantel_haenszel(tables, measure='OR')`** — MH pooled OR/RR, CMH chi-squared,
+  Breslow-Day homogeneity test. Validates against R `stats::mantelhaen.test()`.
+
+#### Meta-Analysis Module
+
+- **`rma(yi, vi, method='REML')`** — Inverse-variance weighted meta-analysis
+  matching R `metafor::rma()`. Methods: FE, DerSimonian-Laird, REML,
+  Paule-Mandel. Heterogeneity: Cochran's Q, I², H², tau² with SE.
+
+#### GEE Module
+
+- **`gee(y, X, cluster_id, family='gaussian', corr_structure='exchangeable')`**
+  — Generalized Estimating Equations matching R `geepack::geeglm()`. First
+  PyStatsBio module to import Family/Link from `pystatistics.regression`.
+  Working correlations: independence, exchangeable, AR(1), unstructured.
+  Sandwich (robust) variance estimator.
+
+### Tests
+
+190 new tests. Total: 633.
+
 ## 1.1.0
 
 ### Summary
