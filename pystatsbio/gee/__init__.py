@@ -101,6 +101,8 @@ def gee(
     scale_fix: float | None = None,
     tol: float = 1e-6,
     max_iter: int = 50,
+    backend: str | None = None,
+    use_fp64: bool = False,
 ) -> GEEResult:
     """Fit a Generalized Estimating Equations (GEE) model.
 
@@ -158,20 +160,83 @@ def gee(
     >>> result = gee(y, X, cluster_id, family='gaussian')
     >>> print(result.summary())
     """
-    # Convert inputs
-    y_arr = np.asarray(y, dtype=np.float64)
-    X_arr = np.asarray(X, dtype=np.float64)
-    cluster_arr = np.asarray(cluster_id)
+    # Convention shared with the rest of pystatistics GPU-capable
+    # entry points (pca, multinom): tensor input defaults to GPU,
+    # numpy input defaults to CPU. See GPU_BACKEND_CONVENTION.md.
+    import sys as _sys
+    _is_X_tensor = (
+        "torch" in _sys.modules
+        and isinstance(X, _sys.modules["torch"].Tensor)
+    )
 
-    # Validate
-    _validate_inputs(y_arr, X_arr, cluster_arr)
+    if _is_X_tensor:
+        import torch
+        if X.ndim != 2:
+            raise ValueError(f"X must be 2-D, got {X.ndim}-D")
+        if not torch.isfinite(X).all():
+            raise ValueError("X contains non-finite values (NaN or Inf)")
+        if backend is None:
+            backend = "gpu" if X.device.type != "cpu" else "cpu"
+        if backend == "cpu":
+            raise ValueError(
+                "backend='cpu' was specified but X is a torch.Tensor "
+                f"on device {X.device}. Either pass a numpy array / "
+                "CPU DataSource to the CPU backend, or call `.to('cpu')` "
+                "on the DataSource explicitly to move it back."
+            )
+        y_arr = (
+            y.detach().cpu().numpy().astype(np.float64)
+            if isinstance(y, torch.Tensor)
+            else np.asarray(y, dtype=np.float64)
+        )
+        cluster_arr = (
+            cluster_id.detach().cpu().numpy()
+            if isinstance(cluster_id, torch.Tensor)
+            else np.asarray(cluster_id)
+        )
+        if y_arr.ndim != 1:
+            raise ValueError(f"y must be 1-D, got {y_arr.ndim}-D")
+        if cluster_arr.ndim != 1:
+            raise ValueError(
+                f"cluster_id must be 1-D, got {cluster_arr.ndim}-D"
+            )
+        n = y_arr.shape[0]
+        if X.shape[0] != n:
+            raise ValueError(
+                f"y has {n} observations but X has {X.shape[0]} rows"
+            )
+        if cluster_arr.shape[0] != n:
+            raise ValueError(
+                f"y has {n} observations but cluster_id has "
+                f"{cluster_arr.shape[0]} elements"
+            )
+        if not np.all(np.isfinite(y_arr)):
+            raise ValueError("y contains non-finite values (NaN or Inf)")
+        if len(np.unique(cluster_arr)) < 2:
+            raise ValueError(
+                "GEE requires at least 2 clusters, got "
+                f"{len(np.unique(cluster_arr))}"
+            )
+        X_arr = None
+        X_for_gpu = X
+    else:
+        if backend is None:
+            backend = "cpu"
+        y_arr = np.asarray(y, dtype=np.float64)
+        X_arr = np.asarray(X, dtype=np.float64)
+        cluster_arr = np.asarray(cluster_id)
+        _validate_inputs(y_arr, X_arr, cluster_arr)
+        X_for_gpu = None
 
-    # Resolve family and correlation structure
+    if backend not in ("cpu", "auto", "gpu"):
+        raise ValueError(
+            f"backend: must be 'cpu', 'auto', or 'gpu', got {backend!r}"
+        )
+
     fam = resolve_family(family)
     corr = resolve_corr(corr_structure)
 
-    # Validate names
-    p = X_arr.shape[1]
+    p = X_arr.shape[1] if X_arr is not None else X_for_gpu.shape[1]
     if names is not None:
         if len(names) != p:
             raise ValueError(
@@ -181,15 +246,46 @@ def gee(
     else:
         names_tuple = None
 
-    # Fit
-    beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
-        y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter, scale_fix
-    )
+    naive_vcov = None
+    robust_vcov = None
+    if X_arr is None:
+        from pystatsbio.gee.backends.gpu_fit import fit_gee_gpu
+        gpu_device = X_for_gpu.device.type
+        (beta, fitted, residuals, phi, n_iter, converged,
+         naive_vcov, robust_vcov) = fit_gee_gpu(
+            y_arr, X_for_gpu, cluster_arr, fam, corr, tol, max_iter,
+            scale_fix, device=gpu_device, use_fp64=use_fp64,
+        )
+    elif backend == "cpu":
+        beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
+            y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter, scale_fix
+        )
+    else:
+        from pystatistics.core.compute.device import select_device
+        dev = select_device("gpu" if backend == "gpu" else "auto")
+        if dev.is_gpu:
+            from pystatsbio.gee.backends.gpu_fit import fit_gee_gpu
+            (beta, fitted, residuals, phi, n_iter, converged,
+             naive_vcov, robust_vcov) = fit_gee_gpu(
+                y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
+                scale_fix, device=dev.device_type, use_fp64=use_fp64,
+            )
+        elif backend == "gpu":
+            raise RuntimeError(
+                "backend='gpu' requested but no GPU is available. "
+                "Install PyTorch with CUDA/MPS support or use "
+                "backend='cpu'."
+            )
+        else:
+            beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
+                y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
+                scale_fix,
+            )
 
-    # Compute variance-covariance matrices
-    naive_vcov, robust_vcov = sandwich_variance(
-        X_arr, y_arr, fitted, beta, cluster_arr, fam, corr, phi
-    )
+    if naive_vcov is None:
+        naive_vcov, robust_vcov = sandwich_variance(
+            X_arr, y_arr, fitted, beta, cluster_arr, fam, corr, phi
+        )
 
     # Standard errors
     naive_se = np.sqrt(np.maximum(np.diag(naive_vcov), 0.0))

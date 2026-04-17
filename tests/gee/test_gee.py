@@ -584,3 +584,124 @@ class TestResultProperties:
         y, X, cid, _ = _gaussian_clustered_data()
         result = gee(y, X, cid, family="gaussian", corr_structure="exchangeable")
         assert result.scale > 0
+
+
+# ===========================================================================
+# GPU backend tests (two-tier validation: CPU vs R, GPU vs CPU)
+# ===========================================================================
+
+
+class TestGeeGPU:
+    """Tests for the GPU GEE backend.
+
+    Two-tier validation: CPU is validated against R ``geepack::geeglm``;
+    GPU is validated against CPU at the ``GPU_FP32`` tier (rtol=1e-4,
+    atol=1e-5) from ``pystatistics.core.compute.tolerances``.
+    """
+
+    def _gpu_available(self) -> bool:
+        try:
+            import torch
+        except ImportError:
+            return False
+        return torch.cuda.is_available() or (
+            hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        )
+
+    def test_invalid_backend_raises(self):
+        y, X, cid, _ = _gaussian_clustered_data()
+        with pytest.raises(ValueError, match="backend"):
+            gee(y, X, cid, family="gaussian", backend="quantum")
+
+    def test_gpu_unavailable_raises_explicitly(self, monkeypatch):
+        """backend='gpu' must raise when no GPU is available (Rule 1)."""
+        y, X, cid, _ = _gaussian_clustered_data()
+        from pystatistics.core.compute import device as dev_mod
+        monkeypatch.setattr(dev_mod, "detect_gpu", lambda *a, **k: None)
+        with pytest.raises(RuntimeError, match="no GPU"):
+            gee(y, X, cid, family="gaussian", backend="gpu")
+
+    def test_auto_backend_falls_back_to_cpu_when_no_gpu(self, monkeypatch):
+        """backend='auto' silently falls back to CPU when no GPU — that
+        is the definition of 'auto', not a Rule 1 violation."""
+        y, X, cid, _ = _gaussian_clustered_data()
+        from pystatistics.core.compute import device as dev_mod
+        monkeypatch.setattr(dev_mod, "detect_gpu", lambda *a, **k: None)
+        r = gee(y, X, cid, family="gaussian", backend="auto")
+        assert r.converged
+
+    def test_gpu_fp64_matches_cpu_coefs(self):
+        """GPU FP64 matches CPU coefficients and robust SE to machine
+        precision (CUDA only — MPS has no FP64)."""
+        if not self._gpu_available():
+            pytest.skip("no GPU available")
+        import torch
+        if not torch.cuda.is_available():
+            pytest.skip("FP64 test requires CUDA (MPS has no FP64)")
+        y, X, cid, _ = _gaussian_clustered_data()
+        r_cpu = gee(y, X, cid, family="gaussian",
+                    corr_structure="exchangeable", backend="cpu")
+        r_gpu = gee(y, X, cid, family="gaussian",
+                    corr_structure="exchangeable", backend="gpu",
+                    use_fp64=True)
+        np.testing.assert_allclose(
+            r_cpu.coefficients, r_gpu.coefficients, rtol=1e-10, atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            r_cpu.robust_se, r_gpu.robust_se, rtol=1e-10, atol=1e-12,
+        )
+
+    def test_gpu_fp32_matches_cpu_at_tier(self):
+        """GPU FP32 matches CPU at the project's GPU_FP32 tier on
+        coefficients and sandwich SE."""
+        from pystatistics.core.compute.tolerances import GPU_FP32
+        if not self._gpu_available():
+            pytest.skip("no GPU available")
+        y, X, cid, _ = _gaussian_clustered_data()
+        r_cpu = gee(y, X, cid, family="gaussian",
+                    corr_structure="exchangeable", backend="cpu")
+        r_gpu = gee(y, X, cid, family="gaussian",
+                    corr_structure="exchangeable", backend="gpu",
+                    use_fp64=False)
+        np.testing.assert_allclose(
+            r_cpu.coefficients, r_gpu.coefficients,
+            rtol=GPU_FP32.rtol, atol=GPU_FP32.atol,
+        )
+        np.testing.assert_allclose(
+            r_cpu.robust_se, r_gpu.robust_se,
+            rtol=GPU_FP32.rtol, atol=GPU_FP32.atol,
+        )
+
+    def test_gpu_datasource_input_matches_gpu_numpy(self):
+        """Passing a torch.Tensor (e.g. from a GPU DataSource) is
+        equivalent to passing the numpy arrays with ``backend='gpu'``,
+        and pays no per-fit H2D transfer for the big X matrix."""
+        from pystatistics.core.compute.tolerances import GPU_FP32
+        from pystatistics import DataSource
+        if not self._gpu_available():
+            pytest.skip("no GPU available")
+        y, X, cid, _ = _gaussian_clustered_data()
+        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to("cuda")
+        r_numpy = gee(y, X, cid, family="gaussian",
+                      corr_structure="exchangeable", backend="gpu",
+                      use_fp64=False)
+        r_tensor = gee(gds["y"], gds["X"], gds["cid"],
+                       family="gaussian", corr_structure="exchangeable",
+                       use_fp64=False)  # backend inferred from tensor
+        np.testing.assert_allclose(
+            r_numpy.coefficients, r_tensor.coefficients,
+            rtol=GPU_FP32.rtol, atol=GPU_FP32.atol,
+        )
+
+    def test_gpu_tensor_with_cpu_backend_raises(self):
+        """Rule 1: no silent GPU→CPU migration when the caller is
+        explicit."""
+        from pystatistics import DataSource
+        if not self._gpu_available():
+            pytest.skip("no GPU available")
+        y, X, cid, _ = _gaussian_clustered_data()
+        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to("cuda")
+        with pytest.raises(ValueError, match="torch.Tensor"):
+            gee(gds["y"], gds["X"], gds["cid"],
+                family="gaussian", backend="cpu")
