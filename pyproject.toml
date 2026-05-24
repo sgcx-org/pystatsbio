@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pystatsbio"
-version = "1.6.0"
+version = "1.6.1"
 description = "Biotech and pharmaceutical statistical computing for Python"
 readme = "README.md"
 license = "MIT"
@@ -23,7 +23,7 @@ keywords = [
     "gpu",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",

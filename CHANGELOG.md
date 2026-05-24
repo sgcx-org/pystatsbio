@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1
+
+### Changed
+- Promoted the PyPI Development Status classifier from "3 - Alpha" to
+  "5 - Production/Stable", reflecting the maturity of the seven shipped,
+  R-validated modules.
+
+
 ## 1.6.0
 
 - **GEE GPU backend** — `pystatsbio/gee/backends/gpu_fit.py`,
