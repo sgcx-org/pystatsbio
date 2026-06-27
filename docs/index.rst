@@ -11,6 +11,9 @@ Biotech and pharmaceutical statistical computing for Python. Built on `PyStatist
    doseresponse
    diagnostic
    pk
+   epi
+   meta
+   gee
 
 Indices and tables
 ==================
