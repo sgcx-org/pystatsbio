@@ -253,10 +253,8 @@ def fit_gee_gpu(
     import torch
 
     if device == "mps" and use_fp64:
-        raise RuntimeError(
-            "GPU GEE: MPS does not support FP64. Use use_fp64=False "
-            "or backend='cpu'."
-        )
+        from pystatistics.core.compute.backend import FP64_REQUIRES_CUDA_MSG
+        raise RuntimeError(FP64_REQUIRES_CUDA_MSG)
 
     torch_device = torch.device(device)
     dtype = torch.float64 if use_fp64 else torch.float32

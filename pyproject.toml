@@ -36,7 +36,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "pystatistics>=0.1.0",
+    # 4.0 folds GPU precision into the backend string (gpu_fp64) and ships
+    # core.compute.backend (canonical backend messages) that gee() now uses.
+    "pystatistics>=4.0",
     "numpy>=1.24",
     "scipy>=1.10",
 ]

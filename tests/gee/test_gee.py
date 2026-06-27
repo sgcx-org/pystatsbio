@@ -643,8 +643,7 @@ class TestGeeGPU:
         r_cpu = gee(y, X, cid, family="gaussian",
                     corr_structure="exchangeable", backend="cpu")
         r_gpu = gee(y, X, cid, family="gaussian",
-                    corr_structure="exchangeable", backend="gpu",
-                    use_fp64=True)
+                    corr_structure="exchangeable", backend="gpu_fp64")
         np.testing.assert_allclose(
             r_cpu.coefficients, r_gpu.coefficients, rtol=1e-10, atol=1e-12,
         )
@@ -662,8 +661,7 @@ class TestGeeGPU:
         r_cpu = gee(y, X, cid, family="gaussian",
                     corr_structure="exchangeable", backend="cpu")
         r_gpu = gee(y, X, cid, family="gaussian",
-                    corr_structure="exchangeable", backend="gpu",
-                    use_fp64=False)
+                    corr_structure="exchangeable", backend="gpu")
         np.testing.assert_allclose(
             r_cpu.coefficients, r_gpu.coefficients,
             rtol=GPU_FP32.rtol, atol=GPU_FP32.atol,
@@ -684,11 +682,10 @@ class TestGeeGPU:
         y, X, cid, _ = _gaussian_clustered_data()
         gds = DataSource.from_arrays(X=X, y=y, cid=cid).to("cuda")
         r_numpy = gee(y, X, cid, family="gaussian",
-                      corr_structure="exchangeable", backend="gpu",
-                      use_fp64=False)
+                      corr_structure="exchangeable", backend="gpu")
         r_tensor = gee(gds["y"], gds["X"], gds["cid"],
-                       family="gaussian", corr_structure="exchangeable",
-                       use_fp64=False)  # backend inferred from tensor
+                       family="gaussian",
+                       corr_structure="exchangeable")  # backend from tensor
         np.testing.assert_allclose(
             r_numpy.coefficients, r_tensor.coefficients,
             rtol=GPU_FP32.rtol, atol=GPU_FP32.atol,

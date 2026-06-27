@@ -102,7 +102,6 @@ def gee(
     tol: float = 1e-6,
     max_iter: int = 50,
     backend: str | None = None,
-    use_fp64: bool = False,
 ) -> GEEResult:
     """Fit a Generalized Estimating Equations (GEE) model.
 
@@ -135,6 +134,14 @@ def gee(
         Convergence tolerance for relative coefficient change.
     max_iter : int
         Maximum GEE iterations.
+    backend : str | None
+        Execution target (device and precision), following the pystatistics
+        convention: ``'cpu'`` (float64, the reference path), ``'gpu'``
+        (float32), ``'gpu_fp64'`` (float64, CUDA only — raises on Apple
+        Silicon/MPS, which has no float64), or ``'auto'`` (CUDA if present,
+        else CPU). ``None`` resolves from the input: a numpy array → ``'cpu'``,
+        a GPU ``torch.Tensor`` → ``'gpu'``. Precision lives in the backend
+        string; there is no separate ``use_fp64`` flag.
 
     Returns
     -------
@@ -228,10 +235,14 @@ def gee(
         _validate_inputs(y_arr, X_arr, cluster_arr)
         X_for_gpu = None
 
-    if backend not in ("cpu", "auto", "gpu"):
+    if backend not in ("cpu", "auto", "gpu", "gpu_fp64"):
         raise ValueError(
-            f"backend: must be 'cpu', 'auto', or 'gpu', got {backend!r}"
+            "backend: must be 'cpu', 'auto', 'gpu', or 'gpu_fp64', got "
+            f"{backend!r}"
         )
+    # Precision is encoded in the backend string (gpu_fp64 = CUDA float64),
+    # mirroring the pystatistics 4.0 convention — no separate use_fp64 flag.
+    want_fp64 = backend == "gpu_fp64"
 
     fam = resolve_family(family)
     corr = resolve_corr(corr_structure)
@@ -251,10 +262,15 @@ def gee(
     if X_arr is None:
         from pystatsbio.gee.backends.gpu_fit import fit_gee_gpu
         gpu_device = X_for_gpu.device.type
+        if want_fp64 and gpu_device != "cuda":
+            from pystatistics.core.compute.backend import (
+                FP64_REQUIRES_CUDA_MSG,
+            )
+            raise RuntimeError(FP64_REQUIRES_CUDA_MSG)
         (beta, fitted, residuals, phi, n_iter, converged,
          naive_vcov, robust_vcov) = fit_gee_gpu(
             y_arr, X_for_gpu, cluster_arr, fam, corr, tol, max_iter,
-            scale_fix, device=gpu_device, use_fp64=use_fp64,
+            scale_fix, device=gpu_device, use_fp64=want_fp64,
         )
     elif backend == "cpu":
         beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
@@ -262,20 +278,24 @@ def gee(
         )
     else:
         from pystatistics.core.compute.device import select_device
-        dev = select_device("gpu" if backend == "gpu" else "auto")
+        dev = select_device(
+            "gpu" if backend in ("gpu", "gpu_fp64") else "auto"
+        )
         if dev.is_gpu:
+            if want_fp64 and dev.device_type != "cuda":
+                from pystatistics.core.compute.backend import (
+                    FP64_REQUIRES_CUDA_MSG,
+                )
+                raise RuntimeError(FP64_REQUIRES_CUDA_MSG)
             from pystatsbio.gee.backends.gpu_fit import fit_gee_gpu
             (beta, fitted, residuals, phi, n_iter, converged,
              naive_vcov, robust_vcov) = fit_gee_gpu(
                 y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
-                scale_fix, device=dev.device_type, use_fp64=use_fp64,
+                scale_fix, device=dev.device_type, use_fp64=want_fp64,
             )
-        elif backend == "gpu":
-            raise RuntimeError(
-                "backend='gpu' requested but no GPU is available. "
-                "Install PyTorch with CUDA/MPS support or use "
-                "backend='cpu'."
-            )
+        elif backend in ("gpu", "gpu_fp64"):
+            from pystatistics.core.compute.backend import NO_GPU_MSG
+            raise RuntimeError(NO_GPU_MSG)
         else:
             beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
                 y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
