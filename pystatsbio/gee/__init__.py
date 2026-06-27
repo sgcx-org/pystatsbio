@@ -59,7 +59,7 @@ def _validate_inputs(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If any validation check fails.
     """
     if y.ndim != 1:
@@ -153,7 +153,7 @@ def gee(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If inputs fail validation (mismatched lengths, non-finite values,
         invalid family or correlation structure, fewer than 2 clusters).
 

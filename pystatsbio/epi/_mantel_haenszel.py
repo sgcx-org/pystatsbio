@@ -37,7 +37,7 @@ def _validate_tables(tables: np.ndarray) -> np.ndarray:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If shape or values are invalid.
     """
     if tables.ndim != 3 or tables.shape[1] != 2 or tables.shape[2] != 2:
@@ -341,7 +341,7 @@ def mantel_haenszel(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If tables shape is wrong, measure is invalid, or computations
         are degenerate.
 

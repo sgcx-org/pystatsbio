@@ -298,7 +298,7 @@ class MantelHaenszelParams:
     n_strata : int
         Number of strata.
     measure : str
-        'OR' or 'RR'.
+        'odds-ratio' or 'risk-ratio'.
     """
 
     pooled_estimate: EpiMeasure

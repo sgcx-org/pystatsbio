@@ -50,7 +50,7 @@ def resolve_gpu_family(name: str) -> GPUFamilyOps:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If the family is not supported on the GPU path. The CPU path
         remains available for any family the CPU GEE accepts.
     """

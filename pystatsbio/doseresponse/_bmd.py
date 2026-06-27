@@ -104,7 +104,7 @@ def _bmd_ll4_analytical(params: CurveParams, target: float) -> float:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If the geometry is degenerate (zero denominator, zero numerator,
         or non-positive ratio — all of which indicate the target is
         outside the achievable curve range).
@@ -131,7 +131,7 @@ def _bmd_numerical(params: CurveParams, target: float) -> float:
 
     Raises
     ------
-    RuntimeError
+    NumericalError
         If root-finding fails (target not crossed in log-dose range [-50, 50]).
     """
     def f(log_dose: float) -> float:
@@ -171,7 +171,7 @@ def _bmd_delta_ci(
 
     Raises
     ------
-    RuntimeError
+    NumericalError
         If the parameter covariance matrix is singular (Jacobian is rank-deficient)
         or if numerical issues produce a negative variance estimate.
     """
@@ -258,9 +258,9 @@ def bmd(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If inputs are invalid or the BMR target is outside the curve range.
-    RuntimeError
+    NumericalError
         If numerical BMD computation or CI estimation fails.
 
     Notes

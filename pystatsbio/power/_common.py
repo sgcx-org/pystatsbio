@@ -173,7 +173,7 @@ def _check_power_args(
 
     Raises
     ------
-    ValueError
+    ValidationError
         On any validation failure.
     """
     none_count = sum(x is None for x in (n, effect, power))
@@ -233,7 +233,7 @@ def _solve_parameter(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If the bracket does not straddle the target (no sign change).
     """
     lo, hi = bracket

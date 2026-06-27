@@ -289,7 +289,7 @@ class UnstructuredCorr(CorrStructure):
 
     Raises
     ------
-    ValueError
+    ValidationError
         If clusters have unequal sizes during estimation.
 
     References
@@ -339,7 +339,7 @@ class UnstructuredCorr(CorrStructure):
 
         Raises
         ------
-        ValueError
+        ValidationError
             If cluster sizes are not all equal.
         """
         sizes = {len(r) for r in pearson_resids}
@@ -405,7 +405,7 @@ def resolve_corr(corr_structure: str) -> CorrStructure:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If the name is not recognized.
     """
     cls = _CORR_STRUCTURES.get(corr_structure.lower())

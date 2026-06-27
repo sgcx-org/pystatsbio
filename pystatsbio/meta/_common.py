@@ -279,7 +279,7 @@ def validate_inputs(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If inputs are invalid.
     """
     yi_arr = np.asarray(yi, dtype=np.float64)

@@ -31,7 +31,7 @@ def _validate_arrays(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If arrays are not 1-D, have different lengths, or contain
         invalid values.
     """
@@ -214,7 +214,7 @@ def rate_standardize(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If inputs are invalid or method is not recognized.
 
     Validates against: R epitools::ageadjust.direct(), epitools::ageadjust.indirect()

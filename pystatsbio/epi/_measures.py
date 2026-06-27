@@ -33,7 +33,7 @@ def _validate_2by2(table: NDArray) -> NDArray:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If the table is not 2x2 or contains negative values.
     """
     if table.shape != (2, 2):
@@ -256,7 +256,7 @@ def epi_2by2(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If table is not 2x2, contains negative values, or conf_level
         is out of range.
 

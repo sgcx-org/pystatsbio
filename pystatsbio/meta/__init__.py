@@ -59,10 +59,10 @@ def rma(
 
     Raises
     ------
-    ValueError
+    ValidationError
         If ``method`` is not one of the valid methods, or if inputs
         fail validation (wrong shape, negative variances, etc.).
-    RuntimeError
+    ConvergenceError
         If iterative optimization (REML, PM) fails to converge.
 
     Examples
