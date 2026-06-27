@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.compute.backend import resolve_backend
 from pystatistics.core.exceptions import ValidationError
 
 from pystatsbio.doseresponse._common import BatchDoseResponseResult
@@ -77,24 +78,24 @@ def _batch_gpu(
     response_matrix: NDArray,
     max_iter: int,
     tol: float,
+    *,
+    device_type: str,
+    use_fp64: bool,
 ) -> BatchDoseResponseResult:
-    """Batched Levenberg-Marquardt for LL.4 on GPU (CUDA / MPS / CPU-torch).
+    """Batched Levenberg-Marquardt for LL.4 on a GPU.
 
     Parameters are ``[bottom, top, log_ec50, hill]`` — log-scale EC50
     keeps the optimisation unconstrained.
+
+    The caller resolves the backend: ``device_type`` is ``'cuda'`` or
+    ``'mps'`` and ``use_fp64`` selects float64 (CUDA only — MPS has no
+    float64, so ``backend='gpu'`` runs float32 there). The float32 path
+    floors the convergence tolerance and widens the damping bounds below.
     """
     import torch
 
-    # Select device
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
-
-    # MPS (Apple Silicon) does not support float64 — use float32 there
-    dtype = torch.float32 if device.type == "mps" else torch.float64
+    device = torch.device(device_type)
+    dtype = torch.float64 if use_fp64 else torch.float32
 
     # Adapt numerical constants for precision of chosen dtype
     is_f32 = (dtype == torch.float32)
@@ -279,7 +280,10 @@ def fit_drm_batch(
     model : str
         Model name (currently only ``'LL.4'`` for batch fitting).
     backend : str
-        ``'cpu'``, ``'gpu'``, or ``'auto'``.  GPU uses batched
+        Execution target (device and precision), per the pystatistics
+        convention: ``'cpu'`` (float64), ``'gpu'`` (float32, CUDA or Apple
+        Silicon/MPS), ``'gpu_fp64'`` (float64, CUDA only), or ``'auto'``
+        (CUDA float32 if present, else CPU). GPU uses batched
         Levenberg-Marquardt via PyTorch for massive parallelism.
     max_iter : int
         Maximum LM iterations per compound (default 100).
@@ -312,22 +316,10 @@ def fit_drm_batch(
     if model != "LL.4":
         raise ValidationError(f"Batch fitting currently supports only 'LL.4', got {model!r}")
 
-    if backend == "cpu":
+    target = resolve_backend(backend, supports_fp64=True)
+    if target.device_type == "cpu":
         return _batch_cpu(dose_matrix, response_matrix, model, max_iter, tol)
-
-    if backend == "gpu":
-        return _batch_gpu(dose_matrix, response_matrix, max_iter, tol)
-
-    # auto — try GPU, fall back to CPU
-    try:
-        import torch
-
-        has_gpu = torch.cuda.is_available() or (
-            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-        )
-        if has_gpu:
-            return _batch_gpu(dose_matrix, response_matrix, max_iter, tol)
-    except ImportError:
-        pass
-
-    return _batch_cpu(dose_matrix, response_matrix, model, max_iter, tol)
+    return _batch_gpu(
+        dose_matrix, response_matrix, max_iter, tol,
+        device_type=target.device_type, use_fp64=target.use_fp64,
+    )

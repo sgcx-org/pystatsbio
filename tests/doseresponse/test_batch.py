@@ -86,13 +86,17 @@ class TestBatchGPU:
     """GPU batch fitting (requires torch)."""
 
     @pytest.fixture(autouse=True)
-    def requires_torch(self):
-        pytest.importorskip("torch")
+    def requires_gpu(self):
+        torch = pytest.importorskip("torch")
+        has_gpu = torch.cuda.is_available() or (
+            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        )
+        if not has_gpu:
+            pytest.skip("backend='gpu' requires a CUDA or MPS device")
 
     def test_gpu_runs(self, batch_data):
-        """GPU batch should run without error (even on CPU-torch)."""
+        """GPU batch should run without error on a real GPU."""
         dose, response, _ = batch_data
-        # Force GPU path — will use CPU-torch if no real GPU
         r = fit_drm_batch(dose, response, backend="gpu")
         assert r.n_compounds == dose.shape[0]
 

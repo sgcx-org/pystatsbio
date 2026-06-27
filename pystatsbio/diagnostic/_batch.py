@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.compute.backend import resolve_backend
 from pystatistics.core.exceptions import ValidationError
 
 if TYPE_CHECKING:
@@ -80,32 +81,23 @@ def _batch_auc_cpu(
 # ---------------------------------------------------------------------------
 
 def _batch_auc_gpu(
-    response: NDArray, predictors: NDArray,
+    response: NDArray, predictors: NDArray, *, use_fp64: bool,
 ) -> BatchAUCResult:
-    """Batched AUC + DeLong SE on GPU via PyTorch.
+    """Batched AUC + DeLong SE on a CUDA GPU via PyTorch.
 
     Fully vectorized: no Python loops over markers or samples.
     Uses batched argsort for ranking and vectorized tie detection
     via diff-based boundary detection with cumsum grouping.
+
+    The caller resolves the backend and guarantees a CUDA device (MPS is
+    rejected upstream — its ``scatter_add_`` is ~1000× slower for this
+    workload). ``use_fp64`` selects float64 (``backend='gpu_fp64'``) over the
+    float32 speed default (``backend='gpu'``).
     """
     import torch
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        # MPS scatter_add_ is catastrophically slow for the midrank
-        # computation (1350× slower than CPU on 5K markers).  Metal's
-        # GPU does not handle sparse scatter patterns efficiently.
-        # Fail fast rather than silently delivering a 15-minute wait.
-        raise RuntimeError(
-            "batch_auc GPU backend is not supported on MPS (Apple Silicon). "
-            "MPS scatter_add_ is ~1000× slower than CPU for this workload. "
-            "Use backend='cpu' instead."
-        )
-    else:
-        device = torch.device("cpu")
-
-    dtype = torch.float32 if device.type == "mps" else torch.float64
+    device = torch.device("cuda")
+    dtype = torch.float64 if use_fp64 else torch.float32
 
     N, M = predictors.shape
     case_mask_np = response == 1
@@ -237,7 +229,12 @@ def batch_auc(
     predictors : array of float, shape ``(n_samples, n_markers)``
         Matrix of biomarker values (one column per candidate marker).
     backend : str
-        ``'cpu'``, ``'gpu'``, or ``'auto'``.
+        Execution target (device and precision), per the pystatistics
+        convention: ``'cpu'`` (float64), ``'gpu'`` (CUDA float32),
+        ``'gpu_fp64'`` (CUDA float64), or ``'auto'`` (CUDA float32 if present,
+        else CPU). The GPU path is CUDA-only: Apple Silicon (MPS) is rejected
+        for this workload because its ``scatter_add_`` is ~1000× slower than
+        the CPU.
 
     Returns
     -------
@@ -275,20 +272,16 @@ def batch_auc(
             "Remove or impute missing values before calling batch_auc."
         )
 
-    if backend == "cpu":
+    target = resolve_backend(backend, supports_fp64=True)
+    if target.device_type == "cpu":
         return _batch_auc_cpu(response, predictors)
-
-    if backend == "gpu":
-        return _batch_auc_gpu(response, predictors)
-
-    # auto — use CUDA GPU if available, otherwise CPU.
-    # MPS is excluded: scatter_add_ is catastrophically slow on Metal.
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            return _batch_auc_gpu(response, predictors)
-    except ImportError:
-        pass
-
-    return _batch_auc_cpu(response, predictors)
+    if target.device_type == "mps":
+        # MPS scatter_add_ is catastrophically slow for the midrank
+        # computation (~1000× slower than CPU). Fail fast rather than
+        # silently delivering a 15-minute wait.
+        raise RuntimeError(
+            "batch_auc GPU backend is not supported on MPS (Apple Silicon). "
+            "MPS scatter_add_ is ~1000× slower than CPU for this workload. "
+            "Use backend='cpu' instead."
+        )
+    return _batch_auc_gpu(response, predictors, use_fp64=target.use_fp64)
