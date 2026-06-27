@@ -311,7 +311,7 @@ def _breslow_day_test(
 def mantel_haenszel(
     tables: ArrayLike,
     *,
-    measure: str = "OR",
+    measure: str = "odds-ratio",
     conf_level: float = 0.95,
 ) -> MantelHaenszelResult:
     """Mantel-Haenszel stratified analysis for pooled OR or RR.
@@ -327,7 +327,7 @@ def mantel_haenszel(
         [[a, b], [c, d]] where a = exposed+disease, b = exposed+no disease,
         c = unexposed+disease, d = unexposed+no disease.
     measure : str
-        'OR' for odds ratio or 'RR' for risk ratio.
+        'odds-ratio' or 'risk-ratio'.
     conf_level : float
         Confidence level for intervals. Must be in (0, 1).
 
@@ -343,8 +343,10 @@ def mantel_haenszel(
 
     Validates against: R stats::mantelhaen.test(), DescTools::BreslowDayTest()
     """
-    if measure not in ("OR", "RR"):
-        raise ValidationError(f"measure must be 'OR' or 'RR', got {measure!r}")
+    if measure not in ("odds-ratio", "risk-ratio"):
+        raise ValidationError(
+            f"measure must be 'odds-ratio' or 'risk-ratio', got {measure!r}"
+        )
 
     if not 0 < conf_level < 1:
         raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
@@ -354,15 +356,15 @@ def mantel_haenszel(
 
     z = stats.norm.ppf((1 + conf_level) / 2)
 
-    if measure == "OR":
+    if measure == "odds-ratio":
         pooled = _mh_odds_ratio(tbl, z, conf_level)
     else:
         pooled = _mh_risk_ratio(tbl, z, conf_level)
 
     cmh_chi2, cmh_p = _cmh_test(tbl)
 
-    # Breslow-Day test (only for OR)
-    if measure == "OR":
+    # Breslow-Day test (only for odds-ratio)
+    if measure == "odds-ratio":
         bd_stat, bd_p = _breslow_day_test(tbl, pooled.estimate)
     else:
         bd_stat, bd_p = None, None

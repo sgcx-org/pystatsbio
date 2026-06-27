@@ -19,7 +19,6 @@ from pystatsbio.gee import (
 )
 from pystatsbio.gee._correlation import resolve_corr
 
-
 # ---------------------------------------------------------------------------
 # Test data generators
 # ---------------------------------------------------------------------------
@@ -675,8 +674,8 @@ class TestGeeGPU:
         """Passing a torch.Tensor (e.g. from a GPU DataSource) is
         equivalent to passing the numpy arrays with ``backend='gpu'``,
         and pays no per-fit H2D transfer for the big X matrix."""
-        from pystatistics.core.compute.tolerances import GPU_FP32
         from pystatistics import DataSource
+        from pystatistics.core.compute.tolerances import GPU_FP32
         if not self._gpu_available():
             pytest.skip("no GPU available")
         y, X, cid, _ = _gaussian_clustered_data()

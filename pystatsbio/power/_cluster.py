@@ -41,7 +41,7 @@ def _cluster_power(
         return 0.0
 
     # Use the two-sample t-test power with effective n
-    return _t_test_power(n_eff, d, alpha, "two.sided", "two.sample")
+    return _t_test_power(n_eff, d, alpha, "two-sided", "two-sample")
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ def _cluster_power(
 def power_cluster(
     n_clusters: int | None = None,
     cluster_size: int | None = None,
-    d: float | None = None,
+    effect_size: float | None = None,
     icc: float = 0.05,
     alpha: float = 0.05,
     power: float | None = None,
@@ -61,7 +61,7 @@ def power_cluster(
     Adjusts individual-level sample size by the design effect:
     ``DEFF = 1 + (m - 1) * ICC`` where ``m`` = cluster_size.
 
-    Exactly one of ``n_clusters``, ``d``, ``power`` must be ``None``.
+    Exactly one of ``n_clusters``, ``effect_size``, ``power`` must be ``None``.
 
     Parameters
     ----------
@@ -69,7 +69,7 @@ def power_cluster(
         Number of clusters per arm.
     cluster_size : int
         Average number of subjects per cluster. Always required.
-    d : float or None
+    effect_size : float or None
         Cohen's d effect size.
     icc : float
         Intraclass correlation coefficient (default 0.05).
@@ -84,7 +84,7 @@ def power_cluster(
 
     Examples
     --------
-    >>> r = power_cluster(cluster_size=20, d=0.5, icc=0.05, alpha=0.05, power=0.80)
+    >>> r = power_cluster(cluster_size=20, effect_size=0.5, icc=0.05, alpha=0.05, power=0.80)
     >>> r.n  # clusters per arm
     8
 
@@ -99,33 +99,33 @@ def power_cluster(
         raise ValidationError(f"icc must be in [0, 1], got {icc}")
 
     solve_for = _check_power_args(
-        n=n_clusters, effect=d, power=power, alpha=alpha, effect_name="d",
+        n=n_clusters, effect=effect_size, power=power, alpha=alpha, effect_name="effect_size",
     )
 
     deff = 1.0 + (cluster_size - 1.0) * icc
 
     if solve_for == "power":
-        assert n_clusters is not None and d is not None
-        result_power = _cluster_power(float(n_clusters), cluster_size, d, icc, alpha)
+        assert n_clusters is not None and effect_size is not None
+        result_power = _cluster_power(float(n_clusters), cluster_size, effect_size, icc, alpha)
         result_n = n_clusters
-        result_d = d
+        result_effect_size = effect_size
 
     elif solve_for == "n":
-        assert d is not None and power is not None
-        if d == 0.0:
-            raise ValidationError("Cannot solve for n_clusters when d = 0")
+        assert effect_size is not None and power is not None
+        if effect_size == 0.0:
+            raise ValidationError("Cannot solve for n_clusters when effect_size = 0")
         raw_n = _solve_parameter(
-            func=lambda x: _cluster_power(x, cluster_size, d, icc, alpha),
+            func=lambda x: _cluster_power(x, cluster_size, effect_size, icc, alpha),
             target=power,
             bracket=(1.0, 1e6),
         )
         result_n = math.ceil(raw_n)
         result_power = power
-        result_d = d
+        result_effect_size = effect_size
 
-    else:  # solve_for == "effect" (d)
+    else:  # solve_for == "effect" (effect_size)
         assert n_clusters is not None and power is not None
-        result_d = _solve_parameter(
+        result_effect_size = _solve_parameter(
             func=lambda x: _cluster_power(float(n_clusters), cluster_size, x, icc, alpha),
             target=power,
             bracket=(1e-10, 100.0),
@@ -136,9 +136,9 @@ def power_cluster(
     return PowerResult(
         n=result_n,
         power=result_power,
-        effect_size=result_d,
+        effect_size=result_effect_size,
         alpha=alpha,
-        alternative="two.sided",
+        alternative="two-sided",
         method="Cluster randomized trial power calculation",
         note=(
             f"n is clusters per arm; cluster_size = {cluster_size}; "

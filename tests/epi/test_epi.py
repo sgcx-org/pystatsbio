@@ -13,7 +13,6 @@ from pystatsbio.epi import (
     rate_standardize,
 )
 
-
 # ===========================================================================
 # epi_2by2 tests
 # ===========================================================================
@@ -349,24 +348,24 @@ class TestMantelHaenszelBasic:
         assert result.n_strata == 3
 
     def test_measure_or(self, three_strata):
-        result = mantel_haenszel(three_strata, measure="OR")
-        assert result.measure == "OR"
+        result = mantel_haenszel(three_strata, measure="odds-ratio")
+        assert result.measure == "odds-ratio"
 
     def test_measure_rr(self, three_strata):
-        result = mantel_haenszel(three_strata, measure="RR")
-        assert result.measure == "RR"
+        result = mantel_haenszel(three_strata, measure="risk-ratio")
+        assert result.measure == "risk-ratio"
 
     def test_cmh_p_value_range(self, three_strata):
         result = mantel_haenszel(three_strata)
         assert 0 <= result.cmh_p_value <= 1
 
     def test_breslow_day_computed_for_or(self, three_strata):
-        result = mantel_haenszel(three_strata, measure="OR")
+        result = mantel_haenszel(three_strata, measure="odds-ratio")
         assert result.breslow_day_statistic is not None
         assert result.breslow_day_p_value is not None
 
     def test_breslow_day_none_for_rr(self, three_strata):
-        result = mantel_haenszel(three_strata, measure="RR")
+        result = mantel_haenszel(three_strata, measure="risk-ratio")
         assert result.breslow_day_statistic is None
         assert result.breslow_day_p_value is None
 
@@ -383,7 +382,7 @@ class TestMantelHaenszelValues:
     def test_single_stratum_or_equals_crude(self):
         """With one stratum, MH OR should equal the crude OR."""
         table = np.array([[[20, 80], [10, 90]]])
-        result = mantel_haenszel(table, measure="OR")
+        result = mantel_haenszel(table, measure="odds-ratio")
         # Crude OR = (20*90) / (80*10) = 1800 / 800 = 2.25
         expected_or = (20 * 90) / (80 * 10)
         assert result.pooled_estimate.estimate == pytest.approx(
@@ -393,7 +392,7 @@ class TestMantelHaenszelValues:
     def test_single_stratum_rr_equals_crude(self):
         """With one stratum, MH RR should equal the crude RR."""
         table = np.array([[[20, 80], [10, 90]]])
-        result = mantel_haenszel(table, measure="RR")
+        result = mantel_haenszel(table, measure="risk-ratio")
         # Crude RR = (20/100) / (10/100) = 2.0
         expected_rr = (20 / 100) / (10 / 100)
         assert result.pooled_estimate.estimate == pytest.approx(
@@ -405,7 +404,7 @@ class TestMantelHaenszelValues:
             [[20, 80], [10, 90]],
             [[30, 70], [15, 85]],
         ])
-        result = mantel_haenszel(tables, measure="OR")
+        result = mantel_haenszel(tables, measure="odds-ratio")
         est = result.pooled_estimate
         assert est.ci_lower <= est.estimate <= est.ci_upper
 
@@ -431,7 +430,7 @@ class TestMantelHaenszelHomogeneity:
             [[20, 80], [10, 90]],
             [[20, 80], [10, 90]],
         ])
-        result = mantel_haenszel(tables, measure="OR")
+        result = mantel_haenszel(tables, measure="odds-ratio")
         # BD p-value should be high (strata are identical)
         assert result.breslow_day_p_value > 0.5
 
@@ -444,7 +443,7 @@ class TestMantelHaenszelHomogeneity:
             [[45, 5], [5, 45]],
             [[5, 45], [45, 5]],
         ])
-        result = mantel_haenszel(tables, measure="OR")
+        result = mantel_haenszel(tables, measure="odds-ratio")
         # BD should detect heterogeneity
         assert result.breslow_day_p_value < 0.05
 

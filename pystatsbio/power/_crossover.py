@@ -100,7 +100,7 @@ def _crossover_be_power(
 
 def power_crossover_be(
     n: int | None = None,
-    cv: float | None = None,
+    coef_variation: float | None = None,
     theta1: float = 0.80,
     theta2: float = 1.25,
     theta0: float = 0.95,
@@ -116,7 +116,7 @@ def power_crossover_be(
     ----------
     n : int or None
         Total number of subjects (both sequences).
-    cv : float
+    coef_variation : float
         Within-subject coefficient of variation (e.g., 0.30 for 30% CV).
         Always required.
     theta1 : float
@@ -138,17 +138,17 @@ def power_crossover_be(
 
     Examples
     --------
-    >>> r = power_crossover_be(cv=0.30, power=0.80)
+    >>> r = power_crossover_be(coef_variation=0.30, power=0.80)
     >>> r.n  # total subjects
     36
 
     Validates against: R PowerTOST::sampleN.TOST(), PowerTOST::power.TOST()
     """
     # --- Validate ---
-    if cv is None:
-        raise ValidationError("cv is always required")
-    if cv <= 0.0:
-        raise ValidationError(f"cv must be > 0, got {cv}")
+    if coef_variation is None:
+        raise ValidationError("coef_variation is always required")
+    if coef_variation <= 0.0:
+        raise ValidationError(f"coef_variation must be > 0, got {coef_variation}")
     if not (0.0 < theta1 < 1.0):
         raise ValidationError(f"theta1 must be in (0, 1), got {theta1}")
     if theta2 <= 1.0:
@@ -171,7 +171,7 @@ def power_crossover_be(
         # Solve for n
         assert power is not None
         raw_n = _solve_parameter(
-            func=lambda x: _crossover_be_power(x, cv, theta0, theta1, theta2, alpha),
+            func=lambda x: _crossover_be_power(x, coef_variation, theta0, theta1, theta2, alpha),
             target=power,
             bracket=(4.0, 1e6),
         )
@@ -182,18 +182,18 @@ def power_crossover_be(
         result_power = power
     else:
         # Solve for power
-        result_power = _crossover_be_power(float(n), cv, theta0, theta1, theta2, alpha)
+        result_power = _crossover_be_power(float(n), coef_variation, theta0, theta1, theta2, alpha)
         result_n = n
 
     return PowerResult(
         n=result_n,
         power=result_power,
-        effect_size=cv,  # report CV as the "effect size" metric
+        effect_size=coef_variation,  # report CV as the "effect size" metric
         alpha=alpha,
-        alternative="two.sided",
+        alternative="two-sided",
         method="2x2 crossover bioequivalence power calculation (TOST)",
         note=(
-            f"n is total subjects (both sequences); CV = {cv:.2%}; "
+            f"n is total subjects (both sequences); CV = {coef_variation:.2%}; "
             f"BE limits = [{theta1}, {theta2}]; theta0 = {theta0}"
         ),
     )

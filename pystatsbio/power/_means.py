@@ -13,8 +13,8 @@ from scipy.stats import t as t_dist
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 
-_VALID_TYPES = ("two.sample", "one.sample", "paired")
-_VALID_ALTERNATIVES = ("two.sided", "less", "greater")
+_VALID_TYPES = ("two-sample", "one-sample", "paired")
+_VALID_ALTERNATIVES = ("two-sided", "less", "greater")
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ def _normal_approx_power(
     alternative: str,
 ) -> float:
     """Normal approximation to noncentral t power (exact as df -> inf)."""
-    if alternative == "two.sided":
+    if alternative == "two-sided":
         z_crit = norm.ppf(1.0 - alpha / 2.0)
         return float(norm.sf(z_crit - ncp) + norm.cdf(-z_crit - ncp))
     elif alternative == "greater":
@@ -57,9 +57,9 @@ def _t_test_power(
     alpha : float
         Significance level.
     alternative : str
-        'two.sided', 'less', or 'greater'.
+        'two-sided', 'less', or 'greater'.
     type : str
-        'two.sample', 'one.sample', or 'paired'.
+        'two-sample', 'one-sample', or 'paired'.
 
     Returns
     -------
@@ -67,10 +67,10 @@ def _t_test_power(
         Statistical power in [0, 1].
     """
     # Noncentrality parameter and degrees of freedom
-    if type == "two.sample":
+    if type == "two-sample":
         ncp = d * math.sqrt(n / 2.0)
         df = 2.0 * n - 2.0
-    else:  # one.sample or paired
+    else:  # one-sample or paired
         ncp = d * math.sqrt(n)
         df = n - 1.0
 
@@ -82,7 +82,7 @@ def _t_test_power(
         return _normal_approx_power(ncp, alpha, alternative)
 
     # Power via noncentral t distribution
-    if alternative == "two.sided":
+    if alternative == "two-sided":
         t_crit = t_dist.ppf(1.0 - alpha / 2.0, df)
         # P(|T| > t_crit) under H1
         pwr = float(nct.sf(t_crit, df, ncp) + nct.cdf(-t_crit, df, ncp))
@@ -108,31 +108,31 @@ def _t_test_power(
 
 def power_t_test(
     n: int | None = None,
-    d: float | None = None,
+    effect_size: float | None = None,
     alpha: float = 0.05,
     power: float | None = None,
-    alternative: str = "two.sided",
-    type: str = "two.sample",
+    alternative: str = "two-sided",
+    test_type: str = "two-sample",
 ) -> PowerResult:
     """Power calculation for t-tests.
 
-    Exactly one of ``n``, ``d``, ``power`` must be ``None`` — that parameter
-    is solved for given the others.
+    Exactly one of ``n``, ``effect_size``, ``power`` must be ``None`` — that
+    parameter is solved for given the others.
 
     Parameters
     ----------
     n : int or None
         Sample size per group (two-sample) or total (one-sample/paired).
-    d : float or None
+    effect_size : float or None
         Cohen's d effect size.
     alpha : float
         Significance level (default 0.05).
     power : float or None
         Desired statistical power (1 - beta).
     alternative : str
-        ``'two.sided'``, ``'less'``, or ``'greater'``.
-    type : str
-        ``'two.sample'``, ``'one.sample'``, or ``'paired'``.
+        ``'two-sided'``, ``'less'``, or ``'greater'``.
+    test_type : str
+        ``'two-sample'``, ``'one-sample'``, or ``'paired'``.
 
     Returns
     -------
@@ -140,10 +140,10 @@ def power_t_test(
 
     Examples
     --------
-    >>> r = power_t_test(d=0.5, alpha=0.05, power=0.80)
+    >>> r = power_t_test(effect_size=0.5, alpha=0.05, power=0.80)
     >>> r.n
     64
-    >>> r = power_t_test(n=50, d=0.5, alpha=0.05)
+    >>> r = power_t_test(n=50, effect_size=0.5, alpha=0.05)
     >>> round(r.power, 3)
     0.697
 
@@ -154,54 +154,60 @@ def power_t_test(
         raise ValidationError(
             f"alternative must be one of {_VALID_ALTERNATIVES}, got {alternative!r}"
         )
-    if type not in _VALID_TYPES:
-        raise ValidationError(f"type must be one of {_VALID_TYPES}, got {type!r}")
+    if test_type not in _VALID_TYPES:
+        raise ValidationError(
+            f"test_type must be one of {_VALID_TYPES}, got {test_type!r}"
+        )
 
-    solve_for = _check_power_args(n=n, effect=d, power=power, alpha=alpha, effect_name="d")
+    solve_for = _check_power_args(
+        n=n, effect=effect_size, power=power, alpha=alpha, effect_name="effect_size"
+    )
 
-    # For two-sided tests, R's pwr works with |d|
-    d_internal = d
-    if d is not None and alternative == "two.sided":
-        d_internal = abs(d)
+    # For two-sided tests, R's pwr works with |effect_size|
+    d_internal = effect_size
+    if effect_size is not None and alternative == "two-sided":
+        d_internal = abs(effect_size)
 
     # --- Solve ---
     if solve_for == "power":
         assert n is not None and d_internal is not None
-        result_power = _t_test_power(float(n), d_internal, alpha, alternative, type)
+        result_power = _t_test_power(float(n), d_internal, alpha, alternative, test_type)
         result_n = n
-        result_d = d
+        result_effect_size = effect_size
 
     elif solve_for == "n":
         assert d_internal is not None and power is not None
         if d_internal == 0.0:
-            raise ValidationError("Cannot solve for n when d = 0 (no effect)")
+            raise ValidationError(
+                "Cannot solve for n when effect_size = 0 (no effect)"
+            )
         raw_n = _solve_parameter(
-            func=lambda x: _t_test_power(x, d_internal, alpha, alternative, type),
+            func=lambda x: _t_test_power(x, d_internal, alpha, alternative, test_type),
             target=power,
             bracket=(2.0, 1e7),
         )
         result_n = math.ceil(raw_n)
         result_power = power
-        result_d = d
+        result_effect_size = effect_size
 
     else:  # solve_for == "effect"
         assert n is not None and power is not None
-        if alternative == "two.sided":
-            # Solve for positive d (symmetric)
-            result_d = _solve_parameter(
-                func=lambda x: _t_test_power(float(n), x, alpha, alternative, type),
+        if alternative == "two-sided":
+            # Solve for positive effect_size (symmetric)
+            result_effect_size = _solve_parameter(
+                func=lambda x: _t_test_power(float(n), x, alpha, alternative, test_type),
                 target=power,
                 bracket=(1e-10, 100.0),
             )
         elif alternative == "greater":
-            result_d = _solve_parameter(
-                func=lambda x: _t_test_power(float(n), x, alpha, alternative, type),
+            result_effect_size = _solve_parameter(
+                func=lambda x: _t_test_power(float(n), x, alpha, alternative, test_type),
                 target=power,
                 bracket=(1e-10, 100.0),
             )
         else:  # less
-            result_d = _solve_parameter(
-                func=lambda x: _t_test_power(float(n), x, alpha, alternative, type),
+            result_effect_size = _solve_parameter(
+                func=lambda x: _t_test_power(float(n), x, alpha, alternative, test_type),
                 target=power,
                 bracket=(-100.0, -1e-10),
             )
@@ -210,17 +216,17 @@ def power_t_test(
 
     # --- Method label ---
     type_labels = {
-        "two.sample": "Two-sample",
-        "one.sample": "One-sample",
+        "two-sample": "Two-sample",
+        "one-sample": "One-sample",
         "paired": "Paired",
     }
-    method = f"{type_labels[type]} t test power calculation"
-    note = "n is number in *each* group" if type == "two.sample" else ""
+    method = f"{type_labels[test_type]} t test power calculation"
+    note = "n is number in *each* group" if test_type == "two-sample" else ""
 
     return PowerResult(
         n=result_n,
         power=result_power,
-        effect_size=result_d,
+        effect_size=result_effect_size,
         alpha=alpha,
         alternative=alternative,
         method=method,
@@ -230,15 +236,20 @@ def power_t_test(
 
 def power_paired_t_test(
     n: int | None = None,
-    d: float | None = None,
+    effect_size: float | None = None,
     alpha: float = 0.05,
     power: float | None = None,
-    alternative: str = "two.sided",
+    alternative: str = "two-sided",
 ) -> PowerResult:
-    """Convenience wrapper: ``power_t_test`` with ``type='paired'``.
+    """Convenience wrapper: ``power_t_test`` with ``test_type='paired'``.
 
     Validates against: R pwr::pwr.t.test(type='paired')
     """
     return power_t_test(
-        n=n, d=d, alpha=alpha, power=power, alternative=alternative, type="paired",
+        n=n,
+        effect_size=effect_size,
+        alpha=alpha,
+        power=power,
+        alternative=alternative,
+        test_type="paired",
     )

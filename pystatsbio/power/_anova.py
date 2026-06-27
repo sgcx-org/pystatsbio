@@ -97,22 +97,22 @@ def _factorial_power(
 
 def power_anova_oneway(
     n: int | None = None,
-    f: float | None = None,
-    k: int = 2,
+    effect_size: float | None = None,
+    n_groups: int = 2,
     alpha: float = 0.05,
     power: float | None = None,
 ) -> PowerResult:
     """Power calculation for one-way ANOVA (balanced design).
 
-    Exactly one of ``n``, ``f``, ``power`` must be ``None``.
+    Exactly one of ``n``, ``effect_size``, ``power`` must be ``None``.
 
     Parameters
     ----------
     n : int or None
         Sample size per group.
-    f : float or None
+    effect_size : float or None
         Cohen's f effect size.
-    k : int
+    n_groups : int
         Number of groups (default 2).
     alpha : float
         Significance level (default 0.05).
@@ -125,40 +125,42 @@ def power_anova_oneway(
 
     Examples
     --------
-    >>> r = power_anova_oneway(f=0.25, k=3, alpha=0.05, power=0.80)
+    >>> r = power_anova_oneway(effect_size=0.25, n_groups=3, alpha=0.05, power=0.80)
     >>> r.n  # per group
     52
 
     Validates against: R pwr::pwr.anova.test()
     """
-    if k < 2:
-        raise ValidationError(f"k must be >= 2, got {k}")
+    if n_groups < 2:
+        raise ValidationError(f"n_groups must be >= 2, got {n_groups}")
 
-    solve_for = _check_power_args(n=n, effect=f, power=power, alpha=alpha, effect_name="f")
+    solve_for = _check_power_args(
+        n=n, effect=effect_size, power=power, alpha=alpha, effect_name="effect_size"
+    )
 
     if solve_for == "power":
-        assert n is not None and f is not None
-        result_power = _anova_power(float(n), f, k, alpha)
+        assert n is not None and effect_size is not None
+        result_power = _anova_power(float(n), effect_size, n_groups, alpha)
         result_n = n
-        result_f = f
+        result_f = effect_size
 
     elif solve_for == "n":
-        assert f is not None and power is not None
-        if f == 0.0:
-            raise ValidationError("Cannot solve for n when f = 0 (no effect)")
+        assert effect_size is not None and power is not None
+        if effect_size == 0.0:
+            raise ValidationError("Cannot solve for n when effect_size = 0 (no effect)")
         raw_n = _solve_parameter(
-            func=lambda x: _anova_power(x, f, k, alpha),
+            func=lambda x: _anova_power(x, effect_size, n_groups, alpha),
             target=power,
             bracket=(2.0, 1e7),
         )
         result_n = math.ceil(raw_n)
         result_power = power
-        result_f = f
+        result_f = effect_size
 
     else:  # solve_for == "effect"
         assert n is not None and power is not None
         result_f = _solve_parameter(
-            func=lambda x: _anova_power(float(n), x, k, alpha),
+            func=lambda x: _anova_power(float(n), x, n_groups, alpha),
             target=power,
             bracket=(1e-10, 100.0),
         )
@@ -170,15 +172,15 @@ def power_anova_oneway(
         power=result_power,
         effect_size=result_f,
         alpha=alpha,
-        alternative="one.sided",  # F-test is inherently one-sided
-        method=f"Balanced one-way analysis of variance power calculation (k = {k})",
+        alternative="one-sided",  # F-test is inherently one-sided
+        method=f"Balanced one-way analysis of variance power calculation (k = {n_groups})",
         note="n is number in each group",
     )
 
 
 def power_anova_factorial(
     n: int | None = None,
-    f: float | None = None,
+    effect_size: float | None = None,
     n_levels: tuple[int, ...] = (2, 2),
     alpha: float = 0.05,
     power: float | None = None,
@@ -186,13 +188,13 @@ def power_anova_factorial(
 ) -> PowerResult:
     """Power calculation for factorial ANOVA.
 
-    Exactly one of ``n``, ``f``, ``power`` must be ``None``.
+    Exactly one of ``n``, ``effect_size``, ``power`` must be ``None``.
 
     Parameters
     ----------
     n : int or None
         Sample size per cell.
-    f : float or None
+    effect_size : float or None
         Cohen's f effect size for the target effect.
     n_levels : tuple of int
         Number of levels for each factor, e.g. ``(2, 3)`` for a 2x3 design.
@@ -201,7 +203,7 @@ def power_anova_factorial(
     power : float or None
         Desired power.
     effect : str
-        Which effect: ``'interaction'``, ``'main_A'``, ``'main_B'``, etc.
+        Which effect: ``'interaction'``, ``'main-a'``, ``'main-b'``, etc.
 
     Returns
     -------
@@ -209,7 +211,7 @@ def power_anova_factorial(
 
     Examples
     --------
-    >>> r = power_anova_factorial(f=0.25, n_levels=(2, 3), alpha=0.05, power=0.80)
+    >>> r = power_anova_factorial(effect_size=0.25, n_levels=(2, 3), alpha=0.05, power=0.80)
     >>> r.n  # per cell
     36
 
@@ -224,7 +226,7 @@ def power_anova_factorial(
     # Determine numerator df for the target effect
     if effect == "interaction":
         df_num = math.prod(lev - 1 for lev in n_levels)
-    elif effect.startswith("main_"):
+    elif effect.startswith("main-"):
         factor_letter = effect[-1].upper()
         factor_idx = ord(factor_letter) - ord("A")
         if factor_idx < 0 or factor_idx >= len(n_levels):
@@ -235,29 +237,31 @@ def power_anova_factorial(
         df_num = n_levels[factor_idx] - 1
     else:
         raise ValidationError(
-            f"effect must be 'interaction' or 'main_A', 'main_B', etc., got {effect!r}"
+            f"effect must be 'interaction' or 'main-a', 'main-b', etc., got {effect!r}"
         )
 
-    solve_for = _check_power_args(n=n, effect=f, power=power, alpha=alpha, effect_name="f")
+    solve_for = _check_power_args(
+        n=n, effect=effect_size, power=power, alpha=alpha, effect_name="effect_size"
+    )
 
     if solve_for == "power":
-        assert n is not None and f is not None
-        result_power = _factorial_power(float(n), f, n_levels, alpha, df_num)
+        assert n is not None and effect_size is not None
+        result_power = _factorial_power(float(n), effect_size, n_levels, alpha, df_num)
         result_n = n
-        result_f = f
+        result_f = effect_size
 
     elif solve_for == "n":
-        assert f is not None and power is not None
-        if f == 0.0:
-            raise ValidationError("Cannot solve for n when f = 0")
+        assert effect_size is not None and power is not None
+        if effect_size == 0.0:
+            raise ValidationError("Cannot solve for n when effect_size = 0")
         raw_n = _solve_parameter(
-            func=lambda x: _factorial_power(x, f, n_levels, alpha, df_num),
+            func=lambda x: _factorial_power(x, effect_size, n_levels, alpha, df_num),
             target=power,
             bracket=(2.0, 1e7),
         )
         result_n = math.ceil(raw_n)
         result_power = power
-        result_f = f
+        result_f = effect_size
 
     else:  # solve_for == "effect"
         assert n is not None and power is not None
@@ -276,7 +280,7 @@ def power_anova_factorial(
         power=result_power,
         effect_size=result_f,
         alpha=alpha,
-        alternative="one.sided",
+        alternative="one-sided",
         method=f"Factorial ANOVA power calculation ({design_str} design, {effect})",
         note="n is number in each cell",
     )

@@ -16,7 +16,7 @@ class TestPowerResult:
     def _make(self, **kwargs):
         defaults = dict(
             n=64, power=0.80, effect_size=0.5,
-            alpha=0.05, alternative="two.sided",
+            alpha=0.05, alternative="two-sided",
             method="Two-sample t-test power calculation",
         )
         defaults.update(kwargs)
@@ -28,7 +28,7 @@ class TestPowerResult:
         assert r.power == pytest.approx(0.80)
         assert r.effect_size == pytest.approx(0.5)
         assert r.alpha == pytest.approx(0.05)
-        assert r.alternative == "two.sided"
+        assert r.alternative == "two-sided"
 
     def test_frozen(self):
         r = self._make()
@@ -57,7 +57,7 @@ class TestPowerResult:
 
     def test_summary_contains_alternative(self):
         r = self._make()
-        assert "two.sided" in r.summary()
+        assert "two-sided" in r.summary()
 
     def test_summary_contains_effect(self):
         r = self._make()

@@ -13,7 +13,7 @@ from scipy.stats import norm
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 
 _VALID_METHODS = ("schoenfeld", "freedman", "lachin_foulkes")
-_VALID_ALTERNATIVES = ("two.sided", "one.sided")
+_VALID_ALTERNATIVES = ("two-sided", "one-sided")
 
 
 # ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ _VALID_ALTERNATIVES = ("two.sided", "one.sided")
 
 def _z_alpha(alpha: float, alternative: str) -> float:
     """Critical z-value for the given alpha and sidedness."""
-    if alternative == "two.sided":
+    if alternative == "two-sided":
         return norm.ppf(1.0 - alpha / 2.0)
     return norm.ppf(1.0 - alpha)
 
@@ -123,30 +123,30 @@ def _logrank_power_lachin_foulkes(
 
 def power_logrank(
     n: int | None = None,
-    hr: float | None = None,
+    hazard_ratio: float | None = None,
     alpha: float = 0.05,
     power: float | None = None,
-    alternative: str = "two.sided",
+    alternative: str = "two-sided",
     p_event: float = 1.0,
     alloc_ratio: float = 1.0,
     method: str = "schoenfeld",
 ) -> PowerResult:
     """Power calculation for the log-rank test.
 
-    Exactly one of ``n``, ``hr``, ``power`` must be ``None``.
+    Exactly one of ``n``, ``hazard_ratio``, ``power`` must be ``None``.
 
     Parameters
     ----------
     n : int or None
         Total sample size (both groups combined).
-    hr : float or None
+    hazard_ratio : float or None
         Hazard ratio under the alternative hypothesis. Must be != 1.
     alpha : float
         Significance level (default 0.05).
     power : float or None
         Desired power.
     alternative : str
-        ``'two.sided'`` or ``'one.sided'``.
+        ``'two-sided'`` or ``'one-sided'``.
     p_event : float
         Probability of observing an event (1.0 = no censoring).
     alloc_ratio : float
@@ -160,7 +160,7 @@ def power_logrank(
 
     Examples
     --------
-    >>> r = power_logrank(hr=0.7, alpha=0.05, power=0.80)
+    >>> r = power_logrank(hazard_ratio=0.7, alpha=0.05, power=0.80)
     >>> r.n  # total N for both groups
     186
 
@@ -178,14 +178,14 @@ def power_logrank(
         raise ValidationError(f"alloc_ratio must be > 0, got {alloc_ratio}")
 
     solve_for = _check_power_args(
-        n=n, effect=hr, power=power, alpha=alpha, effect_name="hr",
+        n=n, effect=hazard_ratio, power=power, alpha=alpha, effect_name="hazard_ratio",
     )
 
-    # HR must not be 1.0 when solving for n or power
-    if hr is not None and hr == 1.0:
-        raise ValidationError("hr must be != 1.0 (no effect)")
-    if hr is not None and hr <= 0.0:
-        raise ValidationError(f"hr must be > 0, got {hr}")
+    # hazard_ratio must not be 1.0 when solving for n or power
+    if hazard_ratio is not None and hazard_ratio == 1.0:
+        raise ValidationError("hazard_ratio must be != 1.0 (no effect)")
+    if hazard_ratio is not None and hazard_ratio <= 0.0:
+        raise ValidationError(f"hazard_ratio must be > 0, got {hazard_ratio}")
 
     # Select the method
     power_funcs = {
@@ -199,23 +199,23 @@ def power_logrank(
         return _power_func(n_val, hr_val, alpha, alternative, p_event, alloc_ratio)
 
     if solve_for == "power":
-        assert n is not None and hr is not None
-        result_power = _compute(float(n), hr)
+        assert n is not None and hazard_ratio is not None
+        result_power = _compute(float(n), hazard_ratio)
         result_n = n
-        result_hr = hr
+        result_hr = hazard_ratio
 
     elif solve_for == "n":
-        assert hr is not None and power is not None
+        assert hazard_ratio is not None and power is not None
         raw_n = _solve_parameter(
-            func=lambda x: _compute(x, hr),
+            func=lambda x: _compute(x, hazard_ratio),
             target=power,
             bracket=(2.0, 1e7),
         )
         result_n = math.ceil(raw_n)
         result_power = power
-        result_hr = hr
+        result_hr = hazard_ratio
 
-    else:  # solve_for == "effect" (hr)
+    else:  # solve_for == "effect" (hazard_ratio)
         assert n is not None and power is not None
         # HR can be < 1 or > 1. For two-sided, solve for HR < 1 by convention.
         result_hr = _solve_parameter(
