@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 
 from pystatsbio.doseresponse._common import BatchDoseResponseResult
 
@@ -300,16 +301,16 @@ def fit_drm_batch(
     response_matrix = np.asarray(response_matrix, dtype=np.float64)
 
     if dose_matrix.ndim != 2:
-        raise ValueError(
+        raise ValidationError(
             f"dose_matrix must be 2-D (n_compounds, n_doses), got shape {dose_matrix.shape}"
         )
     if dose_matrix.shape != response_matrix.shape:
-        raise ValueError(
+        raise ValidationError(
             f"dose_matrix and response_matrix must have same shape, "
             f"got {dose_matrix.shape} and {response_matrix.shape}"
         )
     if model != "LL.4":
-        raise ValueError(f"Batch fitting currently supports only 'LL.4', got {model!r}")
+        raise ValidationError(f"Batch fitting currently supports only 'LL.4', got {model!r}")
 
     if backend == "cpu":
         return _batch_cpu(dose_matrix, response_matrix, model, max_iter, tol)

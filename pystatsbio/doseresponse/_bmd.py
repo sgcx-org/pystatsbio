@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import NumericalError, ValidationError
 from scipy.optimize import brentq
 from scipy.stats import norm
 
@@ -50,13 +51,13 @@ def _bmd_ll4_analytical(params: CurveParams, target: float) -> float:
     numer = d - target
     denom = target - c
     if denom == 0 or numer == 0:
-        raise ValueError(
+        raise ValidationError(
             f"BMD is undefined: target={target:.4g} is at the curve boundary "
             f"(bottom={c:.4g}, top={d:.4g}). Adjust bmr."
         )
     ratio = numer / denom
     if ratio <= 0:
-        raise ValueError(
+        raise ValidationError(
             f"BMD is undefined: target={target:.4g} is outside the curve range "
             f"[{min(c, d):.4g}, {max(c, d):.4g}]."
         )
@@ -78,7 +79,7 @@ def _bmd_numerical(params: CurveParams, target: float) -> float:
     try:
         log_bmd = brentq(f, -50, 50, xtol=1e-12)
     except ValueError as exc:
-        raise RuntimeError(
+        raise NumericalError(
             f"BMD root-finding failed: target response {target:.4g} was not "
             f"crossed in dose range [exp(-50), exp(50)]. "
             f"Check that bmr is achievable for this curve."
@@ -136,7 +137,7 @@ def _bmd_delta_ci(
     try:
         cov = np.linalg.inv(jac.T @ jac) * s2
     except np.linalg.LinAlgError as exc:
-        raise RuntimeError(
+        raise NumericalError(
             "Cannot compute BMD confidence interval: the Jacobian matrix is "
             "rank-deficient. The model may be overparameterised or the fit "
             "did not converge to a stable solution."
@@ -144,7 +145,7 @@ def _bmd_delta_ci(
 
     var_bmd = float(grad @ cov @ grad)
     if var_bmd < 0:
-        raise RuntimeError(
+        raise NumericalError(
             f"Cannot compute BMD confidence interval: delta-method variance "
             f"is negative ({var_bmd:.4g}), indicating numerical instability "
             f"in the covariance matrix. Try a simpler model or more data."
@@ -212,15 +213,15 @@ def bmd(
     Validates against: EPA BMDS software, R BMDL packages
     """
     if not math.isfinite(bmr):
-        raise ValueError(f"bmr must be finite, got {bmr}")
+        raise ValidationError(f"bmr must be finite, got {bmr}")
     if not (0.0 < bmr < 1.0):
-        raise ValueError(f"bmr must be in (0, 1), got {bmr}")
+        raise ValidationError(f"bmr must be in (0, 1), got {bmr}")
     if bmr_type not in ("extra", "additional"):
-        raise ValueError(f"bmr_type must be 'extra' or 'additional', got {bmr_type!r}")
+        raise ValidationError(f"bmr_type must be 'extra' or 'additional', got {bmr_type!r}")
     if not (0.0 < conf_level < 1.0):
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
     if method != "delta":
-        raise ValueError(f"method must be 'delta', got {method!r}")
+        raise ValidationError(f"method must be 'delta', got {method!r}")
 
     p = fit_result.params
     c, d = p.bottom, p.top
@@ -231,7 +232,7 @@ def bmd(
     # Pre-validate that target is strictly inside the curve range
     lo, hi = min(c, d), max(c, d)
     if not (lo < target < hi):
-        raise ValueError(
+        raise ValidationError(
             f"BMR target {target:.4g} is outside the fitted curve range "
             f"[{lo:.4g}, {hi:.4g}] (bottom={c:.4g}, top={d:.4g}, bmr={bmr}). "
             f"Reduce bmr or check the fitted model."

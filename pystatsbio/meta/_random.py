@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ConvergenceError
 from scipy import optimize, stats
 
 from pystatsbio.meta._common import MetaResult
@@ -244,7 +245,7 @@ def _fit_reml(
 
     Raises
     ------
-    RuntimeError
+    ConvergenceError
         If the optimizer fails to converge.
     """
     upper_bound = max(10.0 * np.var(yi), 10.0 * np.max(vi), 100.0)
@@ -257,7 +258,11 @@ def _fit_reml(
         options={"xatol": 1e-10, "maxiter": 1000},
     )
     if not result.success:
-        raise RuntimeError(f"REML optimization failed: {result.message}")
+        raise ConvergenceError(
+            f"REML optimization failed: {result.message}",
+            iterations=int(getattr(result, "nfev", 0)),
+            reason=str(result.message),
+        )
 
     tau2 = float(max(0.0, result.x))
     tau2_se = _reml_tau2_se(tau2, yi, vi)
@@ -327,7 +332,7 @@ def _fit_pm(
 
     Raises
     ------
-    RuntimeError
+    ConvergenceError
         If the root-finding algorithm fails to converge.
     """
     k = len(yi)
@@ -337,11 +342,15 @@ def _fit_pm(
         tau2 = 0.0
     else:
         upper = max(10.0 * np.var(yi), 10.0 * np.max(vi), 100.0)
+        n_expand = 0
         while _pm_objective(upper, yi, vi, k) > 0.0:
             upper *= 10.0
+            n_expand += 1
             if upper > 1e15:
-                raise RuntimeError(
-                    "Paule-Mandel: could not find upper bracket for tau2"
+                raise ConvergenceError(
+                    "Paule-Mandel: could not find upper bracket for tau2",
+                    iterations=n_expand,
+                    reason="objective stayed positive up to tau2=1e15",
                 )
 
         tau2 = float(

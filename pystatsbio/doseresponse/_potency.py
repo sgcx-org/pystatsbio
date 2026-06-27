@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 from scipy.stats import t as t_dist
 
@@ -75,9 +76,9 @@ def ec50(
     Validates against: R drc::ED()
     """
     if not (0.0 < conf_level < 1.0):
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
     if method != "delta":
-        raise ValueError(f"method must be 'delta', got {method!r}")
+        raise ValidationError(f"method must be 'delta', got {method!r}")
 
     _, param_names = _MODEL_MAP[fit_result.model]
     ec50_idx = param_names.index("ec50")
@@ -138,7 +139,7 @@ def relative_potency(
     Validates against: R drc::compParm(), drc::EDcomp()
     """
     if not (0.0 < conf_level < 1.0):
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     _, names1 = _MODEL_MAP[fit1.model]
     _, names2 = _MODEL_MAP[fit2.model]

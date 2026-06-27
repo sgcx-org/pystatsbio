@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from pystatistics.core.exceptions import ValidationError
 
 from pystatsbio.diagnostic._common import ROCResult
 
@@ -61,7 +62,7 @@ def optimal_cutoff(
     """
     valid_methods = ("youden", "closest_topleft", "cost")
     if method not in valid_methods:
-        raise ValueError(
+        raise ValidationError(
             f"method must be one of {valid_methods}, got {method!r}"
         )
 
@@ -73,7 +74,7 @@ def optimal_cutoff(
     # because they correspond to "classify nobody" or "classify everybody"
     finite_mask = np.isfinite(thresholds)
     if finite_mask.sum() == 0:
-        raise ValueError("ROC result has no finite thresholds")
+        raise ValidationError("ROC result has no finite thresholds")
 
     tpr_f = tpr[finite_mask]
     fpr_f = fpr[finite_mask]

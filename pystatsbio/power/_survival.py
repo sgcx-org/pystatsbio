@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
@@ -166,15 +167,15 @@ def power_logrank(
     Validates against: R gsDesign::nSurv(), TrialSize
     """
     if alternative not in _VALID_ALTERNATIVES:
-        raise ValueError(
+        raise ValidationError(
             f"alternative must be one of {_VALID_ALTERNATIVES}, got {alternative!r}"
         )
     if method not in _VALID_METHODS:
-        raise ValueError(f"method must be one of {_VALID_METHODS}, got {method!r}")
+        raise ValidationError(f"method must be one of {_VALID_METHODS}, got {method!r}")
     if not (0.0 < p_event <= 1.0):
-        raise ValueError(f"p_event must be in (0, 1], got {p_event}")
+        raise ValidationError(f"p_event must be in (0, 1], got {p_event}")
     if alloc_ratio <= 0.0:
-        raise ValueError(f"alloc_ratio must be > 0, got {alloc_ratio}")
+        raise ValidationError(f"alloc_ratio must be > 0, got {alloc_ratio}")
 
     solve_for = _check_power_args(
         n=n, effect=hr, power=power, alpha=alpha, effect_name="hr",
@@ -182,9 +183,9 @@ def power_logrank(
 
     # HR must not be 1.0 when solving for n or power
     if hr is not None and hr == 1.0:
-        raise ValueError("hr must be != 1.0 (no effect)")
+        raise ValidationError("hr must be != 1.0 (no effect)")
     if hr is not None and hr <= 0.0:
-        raise ValueError(f"hr must be > 0, got {hr}")
+        raise ValidationError(f"hr must be > 0, got {hr}")
 
     # Select the method
     power_funcs = {

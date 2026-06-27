@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 
 if TYPE_CHECKING:
     import torch
@@ -252,24 +253,24 @@ def batch_auc(
     predictors = np.asarray(predictors, dtype=np.float64)
 
     if response.ndim != 1:
-        raise ValueError(f"response must be 1-D, got shape {response.shape}")
+        raise ValidationError(f"response must be 1-D, got shape {response.shape}")
     if predictors.ndim != 2:
-        raise ValueError(
+        raise ValidationError(
             f"predictors must be 2-D (n_samples, n_markers), got shape {predictors.shape}"
         )
     if response.shape[0] != predictors.shape[0]:
-        raise ValueError(
+        raise ValidationError(
             f"response length {response.shape[0]} != predictors rows {predictors.shape[0]}"
         )
 
     unique_labels = np.unique(response)
     if not np.array_equal(unique_labels, np.array([0, 1])):
-        raise ValueError(
+        raise ValidationError(
             f"response must be binary (0/1), got unique values {unique_labels}"
         )
 
     if not np.all(np.isfinite(predictors)):
-        raise ValueError(
+        raise ValidationError(
             "predictors contains NaN or infinite values. "
             "Remove or impute missing values before calling batch_auc."
         )

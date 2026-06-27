@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy import stats
-
+from pystatistics.core.exceptions import ValidationError
 from pystatistics.regression.families import Family, resolve_family
+from scipy import stats
 
 from pystatsbio.gee._common import GEEResult
 from pystatsbio.gee._correlation import (
@@ -62,30 +62,30 @@ def _validate_inputs(
         If any validation check fails.
     """
     if y.ndim != 1:
-        raise ValueError(f"y must be 1-D, got {y.ndim}-D")
+        raise ValidationError(f"y must be 1-D, got {y.ndim}-D")
     if X.ndim != 2:
-        raise ValueError(f"X must be 2-D, got {X.ndim}-D")
+        raise ValidationError(f"X must be 2-D, got {X.ndim}-D")
     if cluster_id.ndim != 1:
-        raise ValueError(f"cluster_id must be 1-D, got {cluster_id.ndim}-D")
+        raise ValidationError(f"cluster_id must be 1-D, got {cluster_id.ndim}-D")
 
     n = y.shape[0]
     if X.shape[0] != n:
-        raise ValueError(
+        raise ValidationError(
             f"y has {n} observations but X has {X.shape[0]} rows"
         )
     if cluster_id.shape[0] != n:
-        raise ValueError(
+        raise ValidationError(
             f"y has {n} observations but cluster_id has {cluster_id.shape[0]} elements"
         )
 
     if not np.all(np.isfinite(y)):
-        raise ValueError("y contains non-finite values (NaN or Inf)")
+        raise ValidationError("y contains non-finite values (NaN or Inf)")
     if not np.all(np.isfinite(X)):
-        raise ValueError("X contains non-finite values (NaN or Inf)")
+        raise ValidationError("X contains non-finite values (NaN or Inf)")
 
     unique_clusters = np.unique(cluster_id)
     if len(unique_clusters) < 2:
-        raise ValueError(
+        raise ValidationError(
             f"GEE requires at least 2 clusters, got {len(unique_clusters)}"
         )
 
@@ -179,13 +179,13 @@ def gee(
     if _is_X_tensor:
         import torch
         if X.ndim != 2:
-            raise ValueError(f"X must be 2-D, got {X.ndim}-D")
+            raise ValidationError(f"X must be 2-D, got {X.ndim}-D")
         if not torch.isfinite(X).all():
-            raise ValueError("X contains non-finite values (NaN or Inf)")
+            raise ValidationError("X contains non-finite values (NaN or Inf)")
         if backend is None:
             backend = "gpu" if X.device.type != "cpu" else "cpu"
         if backend == "cpu":
-            raise ValueError(
+            raise ValidationError(
                 "backend='cpu' was specified but X is a torch.Tensor "
                 f"on device {X.device}. Either pass a numpy array / "
                 "CPU DataSource to the CPU backend, or call `.to('cpu')` "
@@ -202,25 +202,25 @@ def gee(
             else np.asarray(cluster_id)
         )
         if y_arr.ndim != 1:
-            raise ValueError(f"y must be 1-D, got {y_arr.ndim}-D")
+            raise ValidationError(f"y must be 1-D, got {y_arr.ndim}-D")
         if cluster_arr.ndim != 1:
-            raise ValueError(
+            raise ValidationError(
                 f"cluster_id must be 1-D, got {cluster_arr.ndim}-D"
             )
         n = y_arr.shape[0]
         if X.shape[0] != n:
-            raise ValueError(
+            raise ValidationError(
                 f"y has {n} observations but X has {X.shape[0]} rows"
             )
         if cluster_arr.shape[0] != n:
-            raise ValueError(
+            raise ValidationError(
                 f"y has {n} observations but cluster_id has "
                 f"{cluster_arr.shape[0]} elements"
             )
         if not np.all(np.isfinite(y_arr)):
-            raise ValueError("y contains non-finite values (NaN or Inf)")
+            raise ValidationError("y contains non-finite values (NaN or Inf)")
         if len(np.unique(cluster_arr)) < 2:
-            raise ValueError(
+            raise ValidationError(
                 "GEE requires at least 2 clusters, got "
                 f"{len(np.unique(cluster_arr))}"
             )
@@ -236,7 +236,7 @@ def gee(
         X_for_gpu = None
 
     if backend not in ("cpu", "auto", "gpu", "gpu_fp64"):
-        raise ValueError(
+        raise ValidationError(
             "backend: must be 'cpu', 'auto', 'gpu', or 'gpu_fp64', got "
             f"{backend!r}"
         )
@@ -250,7 +250,7 @@ def gee(
     p = X_arr.shape[1] if X_arr is not None else X_for_gpu.shape[1]
     if names is not None:
         if len(names) != p:
-            raise ValueError(
+            raise ValidationError(
                 f"names has {len(names)} elements but X has {p} columns"
             )
         names_tuple: tuple[str, ...] | None = tuple(names)

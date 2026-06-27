@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import ArrayLike
+from pystatistics.core.exceptions import ValidationError
 from scipy import stats
 
 from pystatsbio.epi._common import StandardizedRate
@@ -31,25 +32,25 @@ def _validate_arrays(
         invalid values.
     """
     if counts.ndim != 1 or person_time.ndim != 1 or standard_pop.ndim != 1:
-        raise ValueError("counts, person_time, and standard_pop must be 1-D arrays")
+        raise ValidationError("counts, person_time, and standard_pop must be 1-D arrays")
 
     if not (len(counts) == len(person_time) == len(standard_pop)):
-        raise ValueError(
+        raise ValidationError(
             f"counts ({len(counts)}), person_time ({len(person_time)}), "
             f"and standard_pop ({len(standard_pop)}) must have equal length"
         )
 
     if len(counts) == 0:
-        raise ValueError("arrays must not be empty")
+        raise ValidationError("arrays must not be empty")
 
     if np.any(counts < 0):
-        raise ValueError("counts must be non-negative")
+        raise ValidationError("counts must be non-negative")
 
     if np.any(person_time <= 0):
-        raise ValueError("person_time must be positive")
+        raise ValidationError("person_time must be positive")
 
     if np.any(standard_pop < 0):
-        raise ValueError("standard_pop must be non-negative")
+        raise ValidationError("standard_pop must be non-negative")
 
 
 def _direct_standardize(
@@ -72,7 +73,7 @@ def _direct_standardize(
     total_weight = np.sum(standard_pop)
 
     if total_weight <= 0:
-        raise ValueError("sum of standard_pop must be positive for direct method")
+        raise ValidationError("sum of standard_pop must be positive for direct method")
 
     crude_rate = float(np.sum(counts) / np.sum(person_time))
 
@@ -119,7 +120,7 @@ def _indirect_standardize(
     expected = float(np.sum(standard_rates * person_time))
 
     if expected <= 0:
-        raise ValueError(
+        raise ValidationError(
             "expected count must be positive; check that standard rates "
             "and person-time are valid"
         )
@@ -215,10 +216,10 @@ def rate_standardize(
     Validates against: R epitools::ageadjust.direct(), epitools::ageadjust.indirect()
     """
     if method not in ("direct", "indirect"):
-        raise ValueError(f"method must be 'direct' or 'indirect', got {method!r}")
+        raise ValidationError(f"method must be 'direct' or 'indirect', got {method!r}")
 
     if not 0 < conf_level < 1:
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     c = np.asarray(counts, dtype=np.float64)
     pt = np.asarray(person_time, dtype=np.float64)

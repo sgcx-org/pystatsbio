@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from pystatistics.core.exceptions import ValidationError
+
 
 # A bundle of elementwise torch callables for a (family, canonical link)
 # pair. ``mu_from_y`` gives a safe initial mean vector that stays in the
@@ -115,7 +117,7 @@ def resolve_gpu_family(name: str) -> GPUFamilyOps:
             mu_from_y=lambda y: torch.clamp(y, min=1e-2),
         )
 
-    raise ValueError(
+    raise ValidationError(
         f"GPU GEE: unsupported family {name!r}. Supported: "
         "gaussian, binomial, poisson, gamma."
     )

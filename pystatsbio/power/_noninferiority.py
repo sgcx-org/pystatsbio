@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
@@ -77,9 +78,9 @@ def power_noninf_mean(
     Validates against: R TrialSize::TwoSampleMean.NIS()
     """
     if margin < 0:
-        raise ValueError(f"margin must be >= 0, got {margin}")
+        raise ValidationError(f"margin must be >= 0, got {margin}")
     if sd <= 0:
-        raise ValueError(f"sd must be > 0, got {sd}")
+        raise ValidationError(f"sd must be > 0, got {sd}")
 
     solve_for = _check_power_args(
         n=n, effect=delta, power=power, alpha=alpha, effect_name="delta",
@@ -177,24 +178,24 @@ def power_noninf_prop(
     Validates against: R TrialSize::TwoSampleProportion.NIS()
     """
     if p1 is None or p2 is None:
-        raise ValueError("p1 and p2 are always required")
+        raise ValidationError("p1 and p2 are always required")
     if not (0.0 < p1 < 1.0):
-        raise ValueError(f"p1 must be in (0, 1), got {p1}")
+        raise ValidationError(f"p1 must be in (0, 1), got {p1}")
     if not (0.0 < p2 < 1.0):
-        raise ValueError(f"p2 must be in (0, 1), got {p2}")
+        raise ValidationError(f"p2 must be in (0, 1), got {p2}")
     if margin < 0:
-        raise ValueError(f"margin must be >= 0, got {margin}")
+        raise ValidationError(f"margin must be >= 0, got {margin}")
 
     # We solve for n or power; p1/p2 are always provided
     none_count = sum(x is None for x in (n, power))
     if none_count != 1:
-        raise ValueError("Exactly one of n, power must be None")
+        raise ValidationError("Exactly one of n, power must be None")
     if not (0.0 < alpha < 1.0):
-        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+        raise ValidationError(f"alpha must be in (0, 1), got {alpha}")
     if power is not None and not (0.0 < power < 1.0):
-        raise ValueError(f"power must be in (0, 1), got {power}")
+        raise ValidationError(f"power must be in (0, 1), got {power}")
     if n is not None and n < 2:
-        raise ValueError(f"n must be >= 2, got {n}")
+        raise ValidationError(f"n must be >= 2, got {n}")
 
     delta = p1 - p2
 
@@ -287,9 +288,9 @@ def power_equiv_mean(
     Validates against: R PowerTOST::power.TOST(), TOSTER
     """
     if margin < 0:
-        raise ValueError(f"margin must be >= 0, got {margin}")
+        raise ValidationError(f"margin must be >= 0, got {margin}")
     if sd <= 0:
-        raise ValueError(f"sd must be > 0, got {sd}")
+        raise ValidationError(f"sd must be > 0, got {sd}")
 
     solve_for = _check_power_args(
         n=n, effect=delta, power=power, alpha=alpha, effect_name="delta",
@@ -390,9 +391,9 @@ def power_superiority_mean(
     Validates against: R TrialSize
     """
     if margin < 0:
-        raise ValueError(f"margin must be >= 0, got {margin}")
+        raise ValidationError(f"margin must be >= 0, got {margin}")
     if sd <= 0:
-        raise ValueError(f"sd must be > 0, got {sd}")
+        raise ValidationError(f"sd must be > 0, got {sd}")
 
     solve_for = _check_power_args(
         n=n, effect=delta, power=power, alpha=alpha, effect_name="delta",

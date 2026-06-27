@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
@@ -87,7 +88,7 @@ def power_prop_test(
     Validates against: R pwr::pwr.2p.test()
     """
     if alternative not in _VALID_ALTERNATIVES:
-        raise ValueError(
+        raise ValidationError(
             f"alternative must be one of {_VALID_ALTERNATIVES}, got {alternative!r}"
         )
 
@@ -107,7 +108,7 @@ def power_prop_test(
     elif solve_for == "n":
         assert h_internal is not None and power is not None
         if h_internal == 0.0:
-            raise ValueError("Cannot solve for n when h = 0 (no effect)")
+            raise ValidationError("Cannot solve for n when h = 0 (no effect)")
         raw_n = _solve_parameter(
             func=lambda x: _prop_power(x, h_internal, alpha, alternative),
             target=power,
@@ -184,15 +185,15 @@ def power_fisher_test(
     Validates against: R pwr::pwr.2p.test() (via Cohen's h)
     """
     if alternative not in _VALID_ALTERNATIVES:
-        raise ValueError(
+        raise ValidationError(
             f"alternative must be one of {_VALID_ALTERNATIVES}, got {alternative!r}"
         )
     if p1 is None or p2 is None:
-        raise ValueError("p1 and p2 are always required")
+        raise ValidationError("p1 and p2 are always required")
     if not (0.0 < p1 < 1.0):
-        raise ValueError(f"p1 must be in (0, 1), got {p1}")
+        raise ValidationError(f"p1 must be in (0, 1), got {p1}")
     if not (0.0 < p2 < 1.0):
-        raise ValueError(f"p2 must be in (0, 1), got {p2}")
+        raise ValidationError(f"p2 must be in (0, 1), got {p2}")
 
     # Cohen's h from the two proportions
     h = 2.0 * (math.asin(math.sqrt(p1)) - math.asin(math.sqrt(p2)))

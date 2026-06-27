@@ -6,6 +6,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.optimize import brentq
 
 
@@ -76,22 +77,22 @@ def _check_power_args(
     """
     none_count = sum(x is None for x in (n, effect, power))
     if none_count != 1:
-        raise ValueError(
+        raise ValidationError(
             f"Exactly one of n, {effect_name}, power must be None "
             f"(got {none_count} None values)"
         )
 
     if not (0.0 < alpha < 1.0):
-        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+        raise ValidationError(f"alpha must be in (0, 1), got {alpha}")
 
     if n is not None and n < 2:
-        raise ValueError(f"n must be >= 2, got {n}")
+        raise ValidationError(f"n must be >= 2, got {n}")
 
     if power is not None and not (0.0 < power < 1.0):
-        raise ValueError(f"power must be in (0, 1), got {power}")
+        raise ValidationError(f"power must be in (0, 1), got {power}")
 
     if effect is not None and not math.isfinite(effect):
-        raise ValueError(f"{effect_name} must be finite, got {effect}")
+        raise ValidationError(f"{effect_name} must be finite, got {effect}")
 
     if n is None:
         return "n"
@@ -140,7 +141,7 @@ def _solve_parameter(
 
     # Check bracket validity
     if f_lo * f_hi > 0:
-        raise ValueError(
+        raise ValidationError(
             f"Cannot solve: target {target:.6f} is outside achievable range "
             f"[{func(lo):.6f}, {func(hi):.6f}] for the given parameters. "
             f"Try different input values."

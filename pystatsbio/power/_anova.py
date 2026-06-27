@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import f as f_dist
 from scipy.stats import ncf
 
@@ -131,7 +132,7 @@ def power_anova_oneway(
     Validates against: R pwr::pwr.anova.test()
     """
     if k < 2:
-        raise ValueError(f"k must be >= 2, got {k}")
+        raise ValidationError(f"k must be >= 2, got {k}")
 
     solve_for = _check_power_args(n=n, effect=f, power=power, alpha=alpha, effect_name="f")
 
@@ -144,7 +145,7 @@ def power_anova_oneway(
     elif solve_for == "n":
         assert f is not None and power is not None
         if f == 0.0:
-            raise ValueError("Cannot solve for n when f = 0 (no effect)")
+            raise ValidationError("Cannot solve for n when f = 0 (no effect)")
         raw_n = _solve_parameter(
             func=lambda x: _anova_power(x, f, k, alpha),
             target=power,
@@ -215,10 +216,10 @@ def power_anova_factorial(
     Validates against: R pwr::pwr.f2.test() (via df conversion)
     """
     if len(n_levels) < 2:
-        raise ValueError("n_levels must have at least 2 factors")
+        raise ValidationError("n_levels must have at least 2 factors")
     for i, lev in enumerate(n_levels):
         if lev < 2:
-            raise ValueError(f"Factor {i} must have >= 2 levels, got {lev}")
+            raise ValidationError(f"Factor {i} must have >= 2 levels, got {lev}")
 
     # Determine numerator df for the target effect
     if effect == "interaction":
@@ -227,13 +228,13 @@ def power_anova_factorial(
         factor_letter = effect[-1].upper()
         factor_idx = ord(factor_letter) - ord("A")
         if factor_idx < 0 or factor_idx >= len(n_levels):
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid effect {effect!r}: factor index {factor_idx} "
                 f"out of range for {len(n_levels)} factors"
             )
         df_num = n_levels[factor_idx] - 1
     else:
-        raise ValueError(
+        raise ValidationError(
             f"effect must be 'interaction' or 'main_A', 'main_B', etc., got {effect!r}"
         )
 
@@ -248,7 +249,7 @@ def power_anova_factorial(
     elif solve_for == "n":
         assert f is not None and power is not None
         if f == 0.0:
-            raise ValueError("Cannot solve for n when f = 0")
+            raise ValidationError("Cannot solve for n when f = 0")
         raw_n = _solve_parameter(
             func=lambda x: _factorial_power(x, f, n_levels, alpha, df_num),
             target=power,

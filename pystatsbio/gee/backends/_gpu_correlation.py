@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pystatistics.core.exceptions import ValidationError
+
 from pystatsbio.gee._correlation import (
     AR1Corr,
     CorrStructure,
@@ -85,7 +87,7 @@ class GPUCorrelation:
             ):
                 return self._R_unstructured
             return torch.eye(s, device=self._device, dtype=self._dtype)
-        raise RuntimeError(
+        raise ValidationError(
             f"GPU GEE: unsupported correlation structure {self.name!r}"
         )
 
@@ -153,7 +155,7 @@ class GPUCorrelation:
             # Unstructured demands equal sizes — CPU path already raises
             # if unequal, so we assume exactly one size group here.
             if len(pearson_groups) != 1:
-                raise ValueError(
+                raise ValidationError(
                     "Unstructured correlation requires all clusters to "
                     f"have the same size, got sizes: "
                     f"{sorted(pearson_groups.keys())}"
@@ -178,7 +180,7 @@ class GPUCorrelation:
             self._R_unstructured = corr
             return
 
-        raise RuntimeError(
+        raise ValidationError(
             f"GPU GEE: unsupported correlation structure {self.name!r}"
         )
 

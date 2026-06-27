@@ -25,7 +25,6 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-
 from pystatistics.regression.families import Family
 
 from pystatsbio.gee._correlation import CorrStructure

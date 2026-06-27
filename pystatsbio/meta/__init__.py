@@ -13,6 +13,7 @@ Validates against: R metafor::rma()
 """
 
 from numpy.typing import ArrayLike
+from pystatistics.core.exceptions import ValidationError
 
 from pystatsbio.meta._common import MetaResult, validate_inputs
 from pystatsbio.meta._fixed import _fit_fixed
@@ -74,7 +75,7 @@ def rma(
     """
     method_upper = method.upper()
     if method_upper not in _VALID_METHODS:
-        raise ValueError(
+        raise ValidationError(
             f"method must be one of {sorted(_VALID_METHODS)}, got {method!r}"
         )
 

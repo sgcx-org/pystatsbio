@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import nct, norm
 from scipy.stats import t as t_dist
 
@@ -150,11 +151,11 @@ def power_t_test(
     """
     # --- Validate ---
     if alternative not in _VALID_ALTERNATIVES:
-        raise ValueError(
+        raise ValidationError(
             f"alternative must be one of {_VALID_ALTERNATIVES}, got {alternative!r}"
         )
     if type not in _VALID_TYPES:
-        raise ValueError(f"type must be one of {_VALID_TYPES}, got {type!r}")
+        raise ValidationError(f"type must be one of {_VALID_TYPES}, got {type!r}")
 
     solve_for = _check_power_args(n=n, effect=d, power=power, alpha=alpha, effect_name="d")
 
@@ -173,7 +174,7 @@ def power_t_test(
     elif solve_for == "n":
         assert d_internal is not None and power is not None
         if d_internal == 0.0:
-            raise ValueError("Cannot solve for n when d = 0 (no effect)")
+            raise ValidationError("Cannot solve for n when d = 0 (no effect)")
         raw_n = _solve_parameter(
             func=lambda x: _t_test_power(x, d_internal, alpha, alternative, type),
             target=power,

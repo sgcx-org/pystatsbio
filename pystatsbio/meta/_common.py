@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from pystatistics.core.exceptions import ValidationError
 
 
 @dataclass(frozen=True)
@@ -159,29 +160,29 @@ def validate_inputs(
     vi_arr = np.asarray(vi, dtype=np.float64)
 
     if yi_arr.ndim != 1:
-        raise ValueError(f"yi must be 1-D, got {yi_arr.ndim}-D")
+        raise ValidationError(f"yi must be 1-D, got {yi_arr.ndim}-D")
     if vi_arr.ndim != 1:
-        raise ValueError(f"vi must be 1-D, got {vi_arr.ndim}-D")
+        raise ValidationError(f"vi must be 1-D, got {vi_arr.ndim}-D")
     if yi_arr.shape[0] != vi_arr.shape[0]:
-        raise ValueError(
+        raise ValidationError(
             f"yi and vi must have the same length, "
             f"got {yi_arr.shape[0]} and {vi_arr.shape[0]}"
         )
     if yi_arr.shape[0] < 2:
-        raise ValueError(
+        raise ValidationError(
             f"meta-analysis requires at least 2 studies, got {yi_arr.shape[0]}"
         )
     if np.any(vi_arr < 0):
-        raise ValueError("vi must contain non-negative values")
+        raise ValidationError("vi must contain non-negative values")
     if np.any(vi_arr == 0):
-        raise ValueError(
+        raise ValidationError(
             "vi contains zero variances; fixed-effects weights would be infinite"
         )
     if not (0 < conf_level < 1):
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
     if np.any(np.isnan(yi_arr)) or np.any(np.isnan(vi_arr)):
-        raise ValueError("yi and vi must not contain NaN values")
+        raise ValidationError("yi and vi must not contain NaN values")
     if np.any(np.isinf(yi_arr)) or np.any(np.isinf(vi_arr)):
-        raise ValueError("yi and vi must not contain infinite values")
+        raise ValidationError("yi and vi must not contain infinite values")
 
     return yi_arr, vi_arr

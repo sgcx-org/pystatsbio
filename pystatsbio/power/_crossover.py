@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
 from scipy.stats import nct, norm
 from scipy.stats import t as t_dist
 
@@ -145,26 +146,26 @@ def power_crossover_be(
     """
     # --- Validate ---
     if cv is None:
-        raise ValueError("cv is always required")
+        raise ValidationError("cv is always required")
     if cv <= 0.0:
-        raise ValueError(f"cv must be > 0, got {cv}")
+        raise ValidationError(f"cv must be > 0, got {cv}")
     if not (0.0 < theta1 < 1.0):
-        raise ValueError(f"theta1 must be in (0, 1), got {theta1}")
+        raise ValidationError(f"theta1 must be in (0, 1), got {theta1}")
     if theta2 <= 1.0:
-        raise ValueError(f"theta2 must be > 1, got {theta2}")
+        raise ValidationError(f"theta2 must be > 1, got {theta2}")
     if theta0 <= 0.0:
-        raise ValueError(f"theta0 must be > 0, got {theta0}")
+        raise ValidationError(f"theta0 must be > 0, got {theta0}")
     if not (0.0 < alpha < 1.0):
-        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
+        raise ValidationError(f"alpha must be in (0, 1), got {alpha}")
 
     # Check: exactly one of n, power must be None
     none_count = sum(x is None for x in (n, power))
     if none_count != 1:
-        raise ValueError("Exactly one of n, power must be None")
+        raise ValidationError("Exactly one of n, power must be None")
     if power is not None and not (0.0 < power < 1.0):
-        raise ValueError(f"power must be in (0, 1), got {power}")
+        raise ValidationError(f"power must be in (0, 1), got {power}")
     if n is not None and n < 4:
-        raise ValueError(f"n must be >= 4 for 2x2 crossover, got {n}")
+        raise ValidationError(f"n must be >= 4 for 2x2 crossover, got {n}")
 
     if n is None:
         # Solve for n

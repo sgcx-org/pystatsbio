@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 from scipy.optimize import least_squares
 
 from pystatsbio.doseresponse._common import CurveParams, DoseResponseResult
@@ -236,27 +237,27 @@ def fit_drm(
     response = np.asarray(response, dtype=np.float64)
 
     if dose.ndim != 1 or response.ndim != 1:
-        raise ValueError("dose and response must be 1-D arrays")
+        raise ValidationError("dose and response must be 1-D arrays")
     if dose.shape != response.shape:
-        raise ValueError(
+        raise ValidationError(
             f"dose and response must have same shape, got {dose.shape} and {response.shape}"
         )
     if model not in VALID_MODELS:
-        raise ValueError(f"model must be one of {VALID_MODELS}, got {model!r}")
+        raise ValidationError(f"model must be one of {VALID_MODELS}, got {model!r}")
 
     model_func, param_names = _MODEL_MAP[model]
     n_params = len(param_names)
     n_obs = len(dose)
 
     if n_obs < n_params + 1:
-        raise ValueError(
+        raise ValidationError(
             f"Need at least {n_params + 1} observations for model {model}, got {n_obs}"
         )
 
     if weights is not None:
         weights = np.asarray(weights, dtype=np.float64)
         if weights.shape != dose.shape:
-            raise ValueError("weights must have same shape as dose")
+            raise ValidationError("weights must have same shape as dose")
 
     # --- Starting values ---
     if start is None:

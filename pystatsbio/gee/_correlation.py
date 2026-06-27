@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 
 
 class CorrStructure(ABC):
@@ -343,7 +344,7 @@ class UnstructuredCorr(CorrStructure):
         """
         sizes = {len(r) for r in pearson_resids}
         if len(sizes) != 1:
-            raise ValueError(
+            raise ValidationError(
                 "Unstructured correlation requires all clusters to have the "
                 f"same size, got sizes: {sorted(sizes)}"
             )
@@ -410,7 +411,7 @@ def resolve_corr(corr_structure: str) -> CorrStructure:
     cls = _CORR_STRUCTURES.get(corr_structure.lower())
     if cls is None:
         valid = ", ".join(sorted(_CORR_STRUCTURES.keys()))
-        raise ValueError(
+        raise ValidationError(
             f"Unknown corr_structure: {corr_structure!r}. Valid: {valid}"
         )
     return cls()

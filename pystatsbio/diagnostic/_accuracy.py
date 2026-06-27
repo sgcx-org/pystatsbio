@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 from scipy import stats
 
 from pystatsbio.diagnostic._common import DiagnosticResult
@@ -59,7 +60,7 @@ def _binomial_ci(
     elif method == "wilson":
         return _wilson_ci(k, n, conf_level)
     else:
-        raise ValueError(
+        raise ValidationError(
             f"ci_method must be 'clopper-pearson' or 'wilson', got {method!r}"
         )
 
@@ -111,13 +112,13 @@ def diagnostic_accuracy(
     predictor = np.asarray(predictor, dtype=np.float64)
 
     if response.ndim != 1 or predictor.ndim != 1:
-        raise ValueError("response and predictor must be 1-D")
+        raise ValidationError("response and predictor must be 1-D")
     if len(response) != len(predictor):
-        raise ValueError("response and predictor must have equal length")
+        raise ValidationError("response and predictor must have equal length")
     if direction not in ("<", ">"):
-        raise ValueError(f"direction must be '<' or '>', got {direction!r}")
+        raise ValidationError(f"direction must be '<' or '>', got {direction!r}")
     if not 0 < conf_level < 1:
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     # Classify
     predicted_pos = predictor >= cutoff if direction == "<" else predictor <= cutoff
@@ -133,7 +134,7 @@ def diagnostic_accuracy(
     n0 = TN + FP  # total negatives
 
     if n1 == 0 or n0 == 0:
-        raise ValueError("Need at least one case and one control")
+        raise ValidationError("Need at least one case and one control")
 
     # Sensitivity and specificity
     sens = TP / n1
@@ -147,7 +148,7 @@ def diagnostic_accuracy(
         prev = n1 / (n1 + n0)
     else:
         if not 0 < prevalence < 1:
-            raise ValueError(f"prevalence must be in (0, 1), got {prevalence}")
+            raise ValidationError(f"prevalence must be in (0, 1), got {prevalence}")
         prev = prevalence
 
     # PPV / NPV (with optional prevalence adjustment via Bayes)

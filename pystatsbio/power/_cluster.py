@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+from pystatistics.core.exceptions import ValidationError
+
 from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
 from pystatsbio.power._means import _t_test_power
 
@@ -90,11 +92,11 @@ def power_cluster(
     """
     # --- Validate ---
     if cluster_size is None:
-        raise ValueError("cluster_size is always required")
+        raise ValidationError("cluster_size is always required")
     if cluster_size < 2:
-        raise ValueError(f"cluster_size must be >= 2, got {cluster_size}")
+        raise ValidationError(f"cluster_size must be >= 2, got {cluster_size}")
     if not (0.0 <= icc <= 1.0):
-        raise ValueError(f"icc must be in [0, 1], got {icc}")
+        raise ValidationError(f"icc must be in [0, 1], got {icc}")
 
     solve_for = _check_power_args(
         n=n_clusters, effect=d, power=power, alpha=alpha, effect_name="d",
@@ -111,7 +113,7 @@ def power_cluster(
     elif solve_for == "n":
         assert d is not None and power is not None
         if d == 0.0:
-            raise ValueError("Cannot solve for n_clusters when d = 0")
+            raise ValidationError("Cannot solve for n_clusters when d = 0")
         raw_n = _solve_parameter(
             func=lambda x: _cluster_power(x, cluster_size, d, icc, alpha),
             target=power,

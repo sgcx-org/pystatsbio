@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from pystatistics.core.exceptions import ValidationError
 from scipy import stats
 
 from pystatsbio.epi._common import Epi2x2Result, EpiMeasure
@@ -35,11 +36,11 @@ def _validate_2by2(table: NDArray) -> NDArray:
         If the table is not 2x2 or contains negative values.
     """
     if table.shape != (2, 2):
-        raise ValueError(
+        raise ValidationError(
             f"table must be 2x2, got shape {table.shape}"
         )
     if np.any(table < 0):
-        raise ValueError("table must contain non-negative values")
+        raise ValidationError("table must contain non-negative values")
 
     # Apply 0.5 continuity correction if any cell is zero
     if np.any(table == 0):
@@ -261,7 +262,7 @@ def epi_2by2(
     Validates against: R epiR::epi.2by2()
     """
     if not 0 < conf_level < 1:
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     tbl = np.asarray(table, dtype=np.float64)
     tbl = _validate_2by2(tbl)

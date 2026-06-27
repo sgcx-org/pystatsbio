@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import ArrayLike
+from pystatistics.core.exceptions import ValidationError
 from scipy import stats
 
 from pystatsbio.epi._common import EpiMeasure, MantelHaenszelResult
@@ -35,15 +36,15 @@ def _validate_tables(tables: np.ndarray) -> np.ndarray:
         If shape or values are invalid.
     """
     if tables.ndim != 3 or tables.shape[1] != 2 or tables.shape[2] != 2:
-        raise ValueError(
+        raise ValidationError(
             f"tables must have shape (K, 2, 2), got {tables.shape}"
         )
 
     if tables.shape[0] == 0:
-        raise ValueError("tables must contain at least one stratum")
+        raise ValidationError("tables must contain at least one stratum")
 
     if np.any(tables < 0):
-        raise ValueError("all table cells must be non-negative")
+        raise ValidationError("all table cells must be non-negative")
 
     return tables.astype(np.float64)
 
@@ -71,7 +72,7 @@ def _mh_odds_ratio(
     denominator = np.sum(b * c / n)
 
     if denominator == 0:
-        raise ValueError(
+        raise ValidationError(
             "MH OR denominator is zero: all strata have b*c = 0"
         )
 
@@ -131,7 +132,7 @@ def _mh_risk_ratio(
     denominator = np.sum(c * n1 / n)
 
     if denominator == 0:
-        raise ValueError(
+        raise ValidationError(
             "MH RR denominator is zero: all strata have c*(a+b) = 0"
         )
 
@@ -195,13 +196,13 @@ def _cmh_test(tables: np.ndarray) -> tuple[float, float]:
     # Guard against strata with n_i <= 1
     valid = n > 1
     if not np.any(valid):
-        raise ValueError("all strata have n <= 1; cannot compute CMH statistic")
+        raise ValidationError("all strata have n <= 1; cannot compute CMH statistic")
 
     sum_diff = np.sum((a - expected)[valid])
     sum_var = np.sum(variance[valid])
 
     if sum_var == 0:
-        raise ValueError("variance sum is zero; cannot compute CMH statistic")
+        raise ValidationError("variance sum is zero; cannot compute CMH statistic")
 
     # Continuity-corrected CMH
     chi2 = (abs(sum_diff) - 0.5) ** 2 / sum_var
@@ -343,10 +344,10 @@ def mantel_haenszel(
     Validates against: R stats::mantelhaen.test(), DescTools::BreslowDayTest()
     """
     if measure not in ("OR", "RR"):
-        raise ValueError(f"measure must be 'OR' or 'RR', got {measure!r}")
+        raise ValidationError(f"measure must be 'OR' or 'RR', got {measure!r}")
 
     if not 0 < conf_level < 1:
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     tbl = np.asarray(tables, dtype=np.float64)
     tbl = _validate_tables(tbl)

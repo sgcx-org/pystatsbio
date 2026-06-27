@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ValidationError
 from scipy import stats
 
 from pystatsbio.diagnostic._common import ROCResult
@@ -64,23 +65,23 @@ def _validate_roc_inputs(
     predictor = np.asarray(predictor, dtype=np.float64)
 
     if response.ndim != 1 or predictor.ndim != 1:
-        raise ValueError("response and predictor must be 1-D arrays")
+        raise ValidationError("response and predictor must be 1-D arrays")
     if response.shape[0] != predictor.shape[0]:
-        raise ValueError(
+        raise ValidationError(
             f"response and predictor must have the same length, "
             f"got {response.shape[0]} and {predictor.shape[0]}"
         )
 
     unique_labels = np.unique(response)
     if not np.array_equal(unique_labels, np.array([0, 1])):
-        raise ValueError(
+        raise ValidationError(
             f"response must be binary (0/1), got unique values {unique_labels}"
         )
 
     n1 = int(response.sum())
     n0 = len(response) - n1
     if n1 < 1 or n0 < 1:
-        raise ValueError("Need at least one case and one control")
+        raise ValidationError("Need at least one case and one control")
 
     return response, predictor
 
@@ -94,7 +95,7 @@ def _resolve_direction(
         med_controls = np.median(predictor[response == 0])
         return "<" if med_controls <= med_cases else ">"
     if direction not in ("<", ">"):
-        raise ValueError(f"direction must be '<', '>' or 'auto', got {direction!r}")
+        raise ValidationError(f"direction must be '<', '>' or 'auto', got {direction!r}")
     return direction
 
 
@@ -201,7 +202,7 @@ def roc(
     Validates against: R ``pROC::roc()``, ``pROC::ci.auc()``
     """
     if not 0 < conf_level < 1:
-        raise ValueError(f"conf_level must be in (0, 1), got {conf_level}")
+        raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
     response, predictor = _validate_roc_inputs(response, predictor)
     direction = _resolve_direction(response, predictor, direction)
@@ -327,10 +328,10 @@ def roc_test(
     Validates against: R ``pROC::roc.test()``
     """
     if method != "delong":
-        raise ValueError(f"Only 'delong' method is supported, got {method!r}")
+        raise ValidationError(f"Only 'delong' method is supported, got {method!r}")
 
     if predictor1 is None or predictor2 is None or response is None:
-        raise ValueError(
+        raise ValidationError(
             "predictor1, predictor2, and response are required for DeLong test"
         )
 
@@ -340,7 +341,7 @@ def roc_test(
 
     n = len(response)
     if predictor1.shape[0] != n or predictor2.shape[0] != n:
-        raise ValueError("predictor1, predictor2, and response must have equal length")
+        raise ValidationError("predictor1, predictor2, and response must have equal length")
 
     n1 = int(response.sum())
     n0 = n - n1

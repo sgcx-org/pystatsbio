@@ -27,6 +27,7 @@ import contextlib
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.exceptions import ConvergenceError, ValidationError
 from scipy import stats
 
 from pystatsbio.pk._common import NCAResult
@@ -50,24 +51,24 @@ def _validate_inputs(
     concentration = np.asarray(concentration, dtype=np.float64).ravel()
 
     if time.shape[0] != concentration.shape[0]:
-        raise ValueError(
+        raise ValidationError(
             f"time and concentration must have equal length, "
             f"got {time.shape[0]} and {concentration.shape[0]}"
         )
     if time.shape[0] < 3:
-        raise ValueError("Need at least 3 time-concentration points for NCA")
+        raise ValidationError("Need at least 3 time-concentration points for NCA")
 
     if np.any(time < 0):
-        raise ValueError("time values must be non-negative")
+        raise ValidationError("time values must be non-negative")
     if np.any(concentration < 0):
-        raise ValueError("concentration values must be non-negative")
+        raise ValidationError("concentration values must be non-negative")
 
     if route not in ("iv", "ev"):
-        raise ValueError(f"route must be 'iv' or 'ev', got {route!r}")
+        raise ValidationError(f"route must be 'iv' or 'ev', got {route!r}")
 
     valid_methods = ("linear", "log-linear", "linear-up/log-down")
     if auc_method not in valid_methods:
-        raise ValueError(
+        raise ValidationError(
             f"auc_method must be one of {valid_methods}, got {auc_method!r}"
         )
 
@@ -78,7 +79,7 @@ def _validate_inputs(
 
     # Check for duplicate time points
     if np.any(np.diff(time) == 0):
-        raise ValueError("Duplicate time points detected; merge or remove them")
+        raise ValidationError("Duplicate time points detected; merge or remove them")
 
     return time, concentration
 
@@ -207,13 +208,24 @@ def _find_last_measurable(concentration: NDArray[np.float64]) -> int:
     return int(nonzero[-1])
 
 
-class LambdaZEstimationError(ValueError):
+class LambdaZEstimationError(ConvergenceError):
     """Raised when the terminal elimination rate constant cannot be estimated.
 
     This is not a programming error — it signals that the concentration-time
     profile does not contain enough terminal phase data to fit a reliable
-    log-linear slope.
+    log-linear slope. Subclasses :class:`ConvergenceError` (a fit-quality
+    failure, per the pystatsbio constitution B3), so it is catchable both as
+    ``LambdaZEstimationError`` and as the library-wide ``ConvergenceError``.
     """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        iterations: int = 0,
+        reason: str = "terminal-phase log-linear fit failed",
+    ):
+        super().__init__(message, iterations=iterations, reason=reason)
 
 
 def _estimate_lambda_z(
@@ -280,9 +292,9 @@ def _estimate_lambda_z(
     if n_points is not None:
         # Fixed number of terminal points (from the end)
         if n_points < 3:
-            raise ValueError("lambda_z_n_points must be >= 3")
+            raise ValidationError("lambda_z_n_points must be >= 3")
         if n_points > len(candidates):
-            raise ValueError(
+            raise ValidationError(
                 f"lambda_z_n_points={n_points} exceeds available "
                 f"terminal points ({len(candidates)})"
             )
