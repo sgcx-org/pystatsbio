@@ -9,7 +9,7 @@ Usage:
     from pystatsbio import power, doseresponse, diagnostic, pk
 """
 
-__version__ = "1.6.1"
+__version__ = "2.0.0"
 __author__ = "Hai-Shuo"
 __email__ = "contact@sgcx.org"
 

@@ -1,5 +1,75 @@
 # Changelog
 
+## 2.0.0 — the consistency release
+
+A library-wide pass that aligns PyStatsBio with the PyStatistics 4.0 API
+conventions. **This release contains breaking interface changes** — parameters,
+option values, and result classes were renamed and old spellings removed (no
+alias). **No statistical or numerical behavior changed.** Requires
+`pystatistics>=4.0`.
+
+#### Result objects (breaking)
+
+- **Every public function now returns a `…Solution`** wrapping an immutable
+  result payload. Each Solution exposes the former result fields as read-only
+  properties (so `result.n`, `result.auc`, `result.coefficients`, etc. keep
+  working) plus the uniform `.backend_name`, `.timing`, `.warnings`, and `.info`
+  accessors and a Jupyter `_repr_html_`. Renamed: `PowerResult` →
+  `PowerSolution`, `GEEResult` → `GEESolution`, `MetaResult` → `MetaSolution`,
+  `NCAResult` → `NCASolution`, the diagnostic `ROCResult` / `ROCTestResult` /
+  `DiagnosticResult` / `CutoffResult` / `BatchAUCResult`, the dose-response
+  `DoseResponseResult` / `BatchDoseResponseResult` / `EC50Result` /
+  `RelativePotencyResult` / `BMDResult`, and the epi `Epi2x2Result` /
+  `MantelHaenszelResult` / `StandardizedRate` → their `*Solution` equivalents.
+- `ec50()` results expose the EC50 as `.estimate` (was `.ec50`); the fitted
+  curve coefficients remain available as `fit.params` (a `CurveParams`).
+
+#### Power-analysis parameters (breaking)
+
+Descriptive names replace the single-letter symbols:
+
+| Old | New |
+|---|---|
+| `d` / `f` / `h` (effect sizes) | `effect_size` |
+| `k` | `n_groups` |
+| `hr` | `hazard_ratio` |
+| `cv` | `coef_variation` |
+| `sd` | `std` |
+| `p1` / `p2` | `prop1` / `prop2` |
+| `power_t_test(type=)` | `test_type` |
+
+`n` (sample size) and `icc` are unchanged.
+
+#### Option values (breaking)
+
+- `alternative`: `"two-sided"` / `"one-sided"` (were `"two.sided"` /
+  `"one.sided"`).
+- `test_type`: `"two-sample"` / `"one-sample"` (were `"two.sample"` /
+  `"one.sample"`).
+- `power_anova_factorial(effect=)`: `"main-a"` / `"main-b"` (were `"main_A"` /
+  `"main_B"`).
+- `epi.mantel_haenszel(measure=)`: `"odds-ratio"` / `"risk-ratio"` (were
+  `"OR"` / `"RR"`).
+
+#### Backend & precision (breaking)
+
+- GPU precision now lives in the `backend=` string: `"cpu"` (float64), `"gpu"`
+  (float32), `"gpu_fp64"` (CUDA float64), or `"auto"`. The separate `use_fp64`
+  flag is removed — pass `backend="gpu_fp64"` for double precision. Applies to
+  `gee`, `diagnostic.batch_auc`, and `doseresponse.fit_drm_batch`.
+- The batch GPU paths now reject unknown backend strings with a clear message
+  and fail loudly when a GPU is requested but unavailable (instead of silently
+  falling back). `batch_auc` is CUDA-only; `fit_drm_batch` runs float32 on
+  Apple Silicon.
+
+#### Errors
+
+- Input validation raises `ValidationError` (which subclasses the builtin
+  `ValueError`, so existing `except ValueError` code keeps working);
+  non-convergence raises `ConvergenceError`; numerical failures raise
+  `NumericalError`; an unavailable GPU raises `RuntimeError`.
+
+
 ## 1.6.1
 
 ### Changed

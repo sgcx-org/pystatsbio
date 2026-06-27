@@ -22,54 +22,77 @@ Each function states exactly which R function it replicates and to what toleranc
 
 ---
 
+## What's New in 2.0
+
+Version 2.0 is a consistency release that aligns the whole library with the
+PyStatistics 4.0 API conventions. **It contains breaking changes**; the
+statistical results themselves are unchanged. Requires `pystatistics>=4.0`.
+
+- **Every function returns a `…Solution`** object with uniform `.backend_name`,
+  `.timing`, `.warnings`, and `.info` accessors plus a Jupyter HTML view. All
+  the previous result fields still work (e.g. `result.n`, `result.auc`).
+- **Power-analysis parameters are now descriptive**: `effect_size` (was
+  `d`/`f`/`h`), `n_groups` (was `k`), `hazard_ratio` (was `hr`),
+  `coef_variation` (was `cv`), `std` (was `sd`), `prop1`/`prop2` (was
+  `p1`/`p2`), and `test_type` (was `type`).
+- **Option values use hyphens, not dots**: `alternative="two-sided"` /
+  `"one-sided"`, `test_type="two-sample"` / `"one-sample"`. `mantel_haenszel`'s
+  `measure` takes `"odds-ratio"` / `"risk-ratio"`.
+- **GPU precision lives in the backend string**: `backend="gpu"` (float32) or
+  `backend="gpu_fp64"` (CUDA float64); the separate `use_fp64` flag is removed.
+- **Errors** are `ValidationError` / `ConvergenceError` / `NumericalError` — the
+  first subclasses the builtin `ValueError`, so existing `except ValueError`
+  code keeps working.
+
+---
+
 ## Quick Start
 
 ```python
 # --- Clinical trial power / sample size ---
+import numpy as np
 from pystatsbio import power
 
-# Solve for sample size (two-sample t-test)
-result = power.power_t_test(d=0.5, power=0.80, alpha=0.05, type="two.sample")
+# Solve for sample size (two-sample t-test); effect_size is Cohen's d
+result = power.power_t_test(effect_size=0.5, power=0.80, alpha=0.05, test_type="two-sample")
 print(result.n)          # per-group sample size
 print(result.summary())
 
 # Solve for power given n
-result = power.power_t_test(n=64, d=0.5, alpha=0.05, type="two.sample")
+result = power.power_t_test(n=64, effect_size=0.5, alpha=0.05, test_type="two-sample")
 print(result.power)
 
 # Paired t-test
-result = power.power_paired_t_test(d=0.3, power=0.80, alpha=0.05)
+result = power.power_paired_t_test(effect_size=0.3, power=0.80, alpha=0.05)
 print(result.n)
 
-# Proportions
-result = power.power_prop_test(p1=0.30, p2=0.50, power=0.80, alpha=0.05)
+# Two proportions (effect_size is Cohen's h)
+h = 2 * (np.arcsin(np.sqrt(0.50)) - np.arcsin(np.sqrt(0.30)))
+result = power.power_prop_test(effect_size=h, power=0.80, alpha=0.05)
 print(result.n)
 
-# Survival (log-rank)
-result = power.power_logrank(
-    p1=0.60, p2=0.40, accrual=12, follow=24, power=0.80, alpha=0.05
-)
-print(result.n_events, result.n_total)
+# Survival (log-rank); the effect is the hazard ratio
+result = power.power_logrank(hazard_ratio=0.6, power=0.80, alpha=0.05)
+print(result.n)
 
 # Non-inferiority for means
 result = power.power_noninf_mean(
-    delta=0.0, sigma=1.0, margin=0.5, power=0.80, alpha=0.05
+    delta=0.0, std=1.0, margin=0.5, power=0.80, alpha=0.05
 )
 print(result.n)
 
 # Crossover bioequivalence (PowerTOST method)
-result = power.power_crossover_be(cv=0.20, power=0.80, alpha=0.05)
+result = power.power_crossover_be(coef_variation=0.20, power=0.80, alpha=0.05)
 print(result.n)          # subjects per sequence
 
 # Cluster-randomized trial
 result = power.power_cluster(
-    d=0.5, icc=0.05, m=20, power=0.80, alpha=0.05
+    effect_size=0.5, icc=0.05, cluster_size=20, power=0.80, alpha=0.05
 )
-print(result.n_clusters)
+print(result.n)          # clusters per arm
 
 
 # --- Dose-response modeling ---
-import numpy as np
 from pystatsbio import doseresponse
 
 dose = np.array([0.001, 0.01, 0.1, 1.0, 10.0, 100.0])
@@ -77,8 +100,8 @@ response = np.array([2.1, 3.5, 12.0, 48.0, 87.5, 97.8])
 
 # Fit 4PL (LL.4) model
 result = doseresponse.fit_drm(dose, response, model="LL.4")
-print(result.params)     # CurveParams(b, c, d, e) — Hill slope, lower, upper, EC50
-print(result.ec50)
+print(result.params)        # CurveParams(bottom, top, ec50, hill)
+print(result.params.ec50)   # the fitted EC50
 print(result.summary())
 
 # Fit 5PL (asymmetric)
@@ -87,54 +110,56 @@ print(result.params)
 
 # Extract EC50 with confidence interval
 ec50_result = doseresponse.ec50(result)
-print(ec50_result.ec50, ec50_result.ci_lower, ec50_result.ci_upper)
+print(ec50_result.estimate, ec50_result.ci_lower, ec50_result.ci_upper)
 
 # Relative potency (reference vs. test compound)
 ref_result = doseresponse.fit_drm(dose, response, model="LL.4")
 test_result = doseresponse.fit_drm(dose * 3, response, model="LL.4")
 rp = doseresponse.relative_potency(ref_result, test_result)
-print(rp.ratio, rp.ci_lower, rp.ci_upper, rp.parallel)
+print(rp.ratio, rp.ci_lower, rp.ci_upper)
 
 # Benchmark dose (BMD/BMDL)
 bmd_result = doseresponse.bmd(result, bmr=0.10)
 print(bmd_result.bmd, bmd_result.bmdl)
 
 # Batch fitting (GPU-accelerated for HTS)
-# responses: (n_curves, n_doses) array
+# dose_matrix / response_matrix: (n_curves, n_doses) arrays
 responses = np.random.rand(500, 6) * 100
-batch = doseresponse.fit_drm_batch(dose, responses, model="LL.4", backend="auto")
-print(batch.ec50)        # shape (500,)
-print(batch.params)      # CurveParams with shape-(500,) arrays
+doses = np.tile(dose, (500, 1))
+batch = doseresponse.fit_drm_batch(doses, responses, model="LL.4", backend="auto")
+print(batch.ec50)        # shape (500,) — one EC50 per curve
 
 
-# --- Diagnostic accuracy ---
+# --- Diagnostic accuracy ---  (binary labels come first, then the scores)
 from pystatsbio import diagnostic
 
-scores = np.array([0.1, 0.4, 0.35, 0.8, 0.9, 0.15, 0.6, 0.75, 0.55, 0.95])
 labels = np.array([0, 0, 0, 1, 1, 0, 1, 1, 0, 1])
+scores = np.array([0.1, 0.4, 0.35, 0.8, 0.9, 0.15, 0.6, 0.75, 0.55, 0.95])
 
-# ROC curve + AUC
-roc_result = diagnostic.roc(scores, labels)
-print(roc_result.auc, roc_result.ci_lower, roc_result.ci_upper)
-print(roc_result.sensitivity, roc_result.specificity)
+# ROC curve + AUC (with DeLong CI)
+roc_result = diagnostic.roc(labels, scores)
+print(roc_result.auc, roc_result.auc_ci_lower, roc_result.auc_ci_upper)
 
-# Compare two biomarkers (DeLong test)
+# Compare two correlated ROC curves (DeLong test)
 scores2 = np.random.rand(10)
-test_result = diagnostic.roc_test(scores, scores2, labels)
-print(test_result.p_value, test_result.summary())
+roc2 = diagnostic.roc(labels, scores2)
+test_result = diagnostic.roc_test(
+    roc_result, roc2, predictor1=scores, predictor2=scores2, response=labels
+)
+print(test_result.p_value)
 
-# Full diagnostic accuracy at a threshold
-da = diagnostic.diagnostic_accuracy(scores, labels, threshold=0.5)
-print(da.sensitivity, da.specificity, da.ppv, da.npv, da.lr_pos, da.lr_neg)
+# Full diagnostic accuracy at a cutoff
+da = diagnostic.diagnostic_accuracy(labels, scores, cutoff=0.5)
+print(da.sensitivity, da.specificity, da.ppv, da.npv)
 
 # Optimal cutoff selection
 cutoff = diagnostic.optimal_cutoff(roc_result, method="youden")
-print(cutoff.threshold, cutoff.sensitivity, cutoff.specificity, cutoff.youden_index)
+print(cutoff.cutoff, cutoff.sensitivity, cutoff.specificity)
 
 # Batch AUC for biomarker panel screening
-# panel: (n_biomarkers, n_subjects) array
-panel = np.random.rand(200, 100)
-batch_auc = diagnostic.batch_auc(panel, labels[:100] if len(labels) >= 100 else np.random.randint(0, 2, 100))
+# 200 candidate biomarkers on 100 subjects -> (n_subjects, n_markers)
+panel = np.random.rand(100, 200)
+batch_auc = diagnostic.batch_auc(np.random.randint(0, 2, 100), panel, backend="auto")
 print(batch_auc.auc)     # shape (200,) — one AUC per biomarker
 
 
@@ -148,8 +173,7 @@ result = pk.nca(time, conc, route="ev", dose=100.0)
 print(result.cmax, result.tmax)
 print(result.auc_last, result.auc_inf)
 print(result.half_life)
-print(result.cl, result.vd)
-print(result.aumc_last, result.mrt)
+print(result.clearance, result.vz)
 print(result.summary())
 
 
@@ -158,30 +182,28 @@ from pystatsbio import epi
 
 # 2x2 table: exposed/unexposed x case/control
 table = np.array([[30, 70], [10, 90]])
-result = epi.epi_2x2(table)
-print(result.risk_ratio, result.odds_ratio, result.summary())
+result = epi.epi_2by2(table)
+# risk_ratio / odds_ratio are EpiMeasure value objects (estimate + CI)
+print(result.risk_ratio.estimate, result.odds_ratio.estimate)
+print(result.summary())
 
 # Mantel-Haenszel stratified analysis
 tables = np.array([[[30, 70], [10, 90]], [[20, 80], [15, 85]]])
-result = epi.mantel_haenszel(tables)
-print(result.common_or, result.p_value)
+result = epi.mantel_haenszel(tables, measure="odds-ratio")
+print(result.pooled_estimate.estimate, result.cmh_p_value)
 
 
 # --- Meta-analysis ---
 from pystatsbio import meta
 
 effects = np.array([0.5, 0.3, 0.8, 0.6, 0.4])
-se = np.array([0.1, 0.15, 0.2, 0.12, 0.18])
+variances = np.array([0.1, 0.15, 0.2, 0.12, 0.18]) ** 2   # sampling variances
 
-# Random-effects (DerSimonian-Laird)
-result = meta.meta_random(effects, se)
-print(result.pooled_effect, result.ci_lower, result.ci_upper)
+# Random-effects meta-analysis (method: 'DL', 'REML', or 'PM')
+result = meta.rma(effects, variances, method="DL")
+print(result.estimate, result.ci_lower, result.ci_upper)
 print(result.tau2, result.I2)
 print(result.summary())
-
-# Publication bias (Egger's test)
-bias = meta.funnel_test(effects, se)
-print(bias.p_value)
 
 
 # --- GEE (clustered data) ---
@@ -190,7 +212,7 @@ from pystatsbio import gee
 y = np.random.randn(200)
 X = np.random.randn(200, 3)
 cluster_id = np.repeat(np.arange(40), 5)
-result = gee.gee(y, X, cluster_id, family='gaussian', corstr='exchangeable')
+result = gee.gee(y, X, cluster_id, family="gaussian", corr_structure="exchangeable")
 print(result.coefficients, result.robust_se)
 print(result.summary())
 ```
@@ -263,7 +285,7 @@ Routes: `iv` (intravenous), `ev` (extravascular).
 
 | Function | R equivalent |
 |----------|--------------|
-| `epi_2x2()` | `epiR::epi.2by2()` |
+| `epi_2by2()` | `epiR::epi.2by2()` |
 | `rate_standardize()` | `epitools::ageadjust.direct()` / `ageadjust.indirect()` |
 | `mantel_haenszel()` | `stats::mantelhaen.test()` |
 
@@ -271,11 +293,10 @@ Routes: `iv` (intravenous), `ev` (extravascular).
 
 | Function | R equivalent |
 |----------|--------------|
-| `meta_fixed()` | `meta::metagen(method="FE")` |
-| `meta_random()` | `meta::metagen(method="DL")` / `metafor::rma()` |
-| `meta_reml()` | `metafor::rma(method="REML")` |
-| `forest_data()` | `meta::forest()` (data extraction for plotting) |
-| `funnel_test()` | `metafor::regtest()` / `meta::metabias()` |
+| `rma(method="DL")` | `meta::metagen(method="DL")` / `metafor::rma()` |
+| `rma(method="REML")` | `metafor::rma(method="REML")` |
+| `rma(method="PM")` | `metafor::rma(method="PM")` |
+| `cochran_q()` / `i_squared()` / `h_squared()` | `metafor::rma()$QE` / `$I2` / `$H2` |
 
 ### `gee` — Generalized Estimating Equations
 
