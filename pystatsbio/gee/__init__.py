@@ -27,7 +27,8 @@ from pystatistics.core.exceptions import ValidationError
 from pystatistics.regression.families import Family, resolve_family
 from scipy import stats
 
-from pystatsbio.gee._common import GEEResult
+from pystatistics.core.result import Result
+from pystatsbio.gee._common import GEEParams, GEESolution
 from pystatsbio.gee._correlation import (
     AR1Corr,
     CorrStructure,
@@ -102,7 +103,7 @@ def gee(
     tol: float = 1e-6,
     max_iter: int = 50,
     backend: str | None = None,
-) -> GEEResult:
+) -> GEESolution:
     """Fit a Generalized Estimating Equations (GEE) model.
 
     GEE extends GLMs to handle correlated/clustered data by specifying
@@ -145,9 +146,10 @@ def gee(
 
     Returns
     -------
-    GEEResult
-        Frozen dataclass with coefficients, robust SE, correlation
-        parameters, convergence diagnostics, and summary method.
+    GEESolution
+        Solution wrapping the GEE coefficients, robust SE, correlation
+        parameters, convergence diagnostics, and a summary method, with the
+        uniform .backend_name/.timing/.warnings/.info accessors.
 
     Raises
     ------
@@ -259,6 +261,9 @@ def gee(
 
     naive_vcov = None
     robust_vcov = None
+    def _gpu_name(device_type: str) -> str:
+        return f"gee_gpu ({device_type}, {'fp64' if want_fp64 else 'fp32'})"
+
     if X_arr is None:
         from pystatsbio.gee.backends.gpu_fit import fit_gee_gpu
         gpu_device = X_for_gpu.device.type
@@ -272,10 +277,12 @@ def gee(
             y_arr, X_for_gpu, cluster_arr, fam, corr, tol, max_iter,
             scale_fix, device=gpu_device, use_fp64=want_fp64,
         )
+        backend_name = _gpu_name(gpu_device)
     elif backend == "cpu":
         beta, fitted, residuals, phi, n_iter, converged = _fit_gee(
             y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter, scale_fix
         )
+        backend_name = "cpu"
     else:
         from pystatistics.core.compute.device import select_device
         dev = select_device(
@@ -293,6 +300,7 @@ def gee(
                 y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
                 scale_fix, device=dev.device_type, use_fp64=want_fp64,
             )
+            backend_name = _gpu_name(dev.device_type)
         elif backend in ("gpu", "gpu_fp64"):
             from pystatistics.core.compute.backend import NO_GPU_MSG
             raise RuntimeError(NO_GPU_MSG)
@@ -301,6 +309,7 @@ def gee(
                 y_arr, X_arr, cluster_arr, fam, corr, tol, max_iter,
                 scale_fix,
             )
+            backend_name = "cpu"
 
     if naive_vcov is None:
         naive_vcov, robust_vcov = sandwich_variance(
@@ -317,7 +326,7 @@ def gee(
 
     n_clusters = len(np.unique(cluster_arr))
 
-    return GEEResult(
+    params = GEEParams(
         coefficients=beta,
         naive_se=naive_se,
         robust_se=robust_se,
@@ -338,10 +347,24 @@ def gee(
         n_iter=n_iter,
         names=names_tuple,
     )
+    result = Result(
+        params=params,
+        info={
+            "family": fam.name,
+            "link": fam.link.name,
+            "correlation": corr.name,
+            "converged": converged,
+            "n_iter": n_iter,
+        },
+        timing=None,
+        backend_name=backend_name,
+    )
+    return GEESolution(result)
 
 
 __all__ = [
-    "GEEResult",
+    "GEESolution",
+    "GEEParams",
     "gee",
     "CorrStructure",
     "IndependenceCorr",

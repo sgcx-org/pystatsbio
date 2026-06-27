@@ -12,7 +12,7 @@ from pystatsbio.gee import (
     AR1Corr,
     CorrStructure,
     ExchangeableCorr,
-    GEEResult,
+    GEESolution,
     IndependenceCorr,
     UnstructuredCorr,
     gee,
@@ -78,10 +78,10 @@ class TestBasicFitting:
     """Basic GEE model fitting."""
 
     def test_gaussian_exchangeable_converges(self):
-        """Gaussian + exchangeable converges and returns GEEResult."""
+        """Gaussian + exchangeable converges and returns GEESolution."""
         y, X, cid, _ = _gaussian_clustered_data()
         result = gee(y, X, cid, family="gaussian", corr_structure="exchangeable")
-        assert isinstance(result, GEEResult)
+        assert isinstance(result, GEESolution)
         assert result.converged
 
     def test_gaussian_exchangeable_coefficients_reasonable(self):
@@ -95,7 +95,7 @@ class TestBasicFitting:
         """Binomial + exchangeable logistic GEE converges."""
         y, X, cid, _ = _binomial_clustered_data()
         result = gee(y, X, cid, family="binomial", corr_structure="exchangeable")
-        assert isinstance(result, GEEResult)
+        assert isinstance(result, GEESolution)
         assert result.converged
         assert result.family_name == "binomial"
         assert result.link_name == "logit"
@@ -144,7 +144,7 @@ class TestBasicFitting:
         mu = np.exp(0.5 + 0.2 * X[:, 1])
         y = rng.gamma(shape=5.0, scale=mu / 5.0)
         result = gee(y, X, cid, family="gamma", corr_structure="exchangeable")
-        assert isinstance(result, GEEResult)
+        assert isinstance(result, GEESolution)
         assert result.family_name == "Gamma"
 
 
@@ -493,7 +493,7 @@ class TestValidation:
 
 
 class TestResultProperties:
-    """Tests for GEEResult properties and methods."""
+    """Tests for GEESolution properties and methods."""
 
     def test_coef_dict_with_names(self):
         """coef property returns dict with provided names."""
@@ -548,7 +548,7 @@ class TestResultProperties:
         assert "x1" in s
 
     def test_result_is_frozen(self):
-        """GEEResult is a frozen dataclass."""
+        """GEESolution attributes are read-only (assigning a property raises)."""
         y, X, cid, _ = _gaussian_clustered_data()
         result = gee(y, X, cid, family="gaussian", corr_structure="exchangeable")
         with pytest.raises(AttributeError):

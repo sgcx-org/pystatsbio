@@ -379,7 +379,7 @@ def fit_gee_gpu(
         )
 
     # Copy GPU-estimated correlation params into the CPU CorrStructure
-    # so GEEResult.correlation_params reflects the fit.
+    # so GEESolution.correlation_params reflects the fit.
     gpu_corr.sync_to_cpu()
 
     return (

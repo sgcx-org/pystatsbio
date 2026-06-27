@@ -3,7 +3,7 @@
 Wraps the CPU :class:`CorrStructure` instances so that R_i matrices and
 parameter updates happen on the device, against Pearson residuals that
 stay in GPU memory between iterations. Only the final float (for
-``GEEResult.correlation_params``) crosses the bus per iteration.
+``GEESolution.correlation_params``) crosses the bus per iteration.
 
 The four supported structures mirror the CPU module exactly:
   - independence: R = I, no parameters
@@ -32,7 +32,7 @@ class GPUCorrelation:
 
     State is managed on the GPU between iterations; at the end of the
     fit ``sync_to_cpu`` copies the estimated parameters back into the
-    wrapped CPU CorrStructure so :class:`GEEResult.correlation_params`
+    wrapped CPU CorrStructure so :class:`GEESolution.correlation_params`
     is populated correctly.
     """
 
@@ -189,7 +189,7 @@ class GPUCorrelation:
 
         Reaches into the CPU CorrStructure's private attributes because
         those are exactly the state that :attr:`CorrStructure.params`
-        exposes in :class:`GEEResult`. The CorrStructure interface does
+        exposes in :class:`GEESolution`. The CorrStructure interface does
         not currently define a public setter (the CPU fit mutates the
         same private attributes in-place), so this module follows the
         same convention.

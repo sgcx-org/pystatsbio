@@ -132,8 +132,15 @@ deprecation shim. Statistical results are unchanged.
 `DoseResponseResult`→`DoseResponseSolution`,
 `BatchDoseResponseResult`→`BatchDoseResponseSolution`,
 `EC50Result`→`EC50Solution`, `RelativePotencyResult`→`RelativePotencySolution`,
-`BMDResult`→`BMDSolution`. (Internal value payloads `EpiMeasure` /
-`StandardizedRate` become the `…Params` payloads of their Solutions.)
+`BMDResult`→`BMDSolution`, and the suffix-less `StandardizedRate`→
+`StandardizedRateSolution` (every top-level return reads as a Solution, even
+when the old name had no `…Result` suffix).
+
+`EpiMeasure` is **not** a Solution: it is a nested `{estimate, ci, se}` value
+object that appears as a *field* of `Epi2x2Solution` / `MantelHaenszelSolution`
+(and is returned by internal helpers). It stays a lightweight frozen dataclass
+— the `…Solution` envelope is for top-level public returns, not the value
+objects nested inside them.
 
 ### Exceptions
 
