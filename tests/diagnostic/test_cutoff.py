@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import CutoffResult, optimal_cutoff, roc
+from pystatsbio.diagnostic import CutoffSolution, optimal_cutoff, roc
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ class TestYouden:
 
     def test_returns_cutoff_result(self, roc_result):
         c = optimal_cutoff(roc_result)
-        assert isinstance(c, CutoffResult)
+        assert isinstance(c, CutoffSolution)
 
     def test_method_is_youden(self, roc_result):
         c = optimal_cutoff(roc_result, method="youden")

@@ -13,16 +13,17 @@ from dataclasses import dataclass
 
 import numpy as np
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 from scipy.stats import norm
 from scipy.stats import t as t_dist
 
-from pystatsbio.doseresponse._common import DoseResponseResult
+from pystatsbio.doseresponse._common import DoseResponseSolution
 from pystatsbio.doseresponse._models import _MODEL_MAP
 
 
 @dataclass(frozen=True)
-class EC50Result:
-    """EC50 (or IC50) with confidence interval."""
+class EC50Params:
+    """Computed payload of EC50 (or IC50) estimation with confidence interval."""
 
     estimate: float
     se: float
@@ -32,9 +33,71 @@ class EC50Result:
     method: str  # 'delta'
 
 
+class EC50Solution(SolutionReprMixin):
+    """Public result of EC50 estimation — wraps ``Result[EC50Params]``.
+
+    Exposes every output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[EC50Params]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- EC50 outputs (from the payload) ---
+    @property
+    def estimate(self) -> float:
+        return self._result.params.estimate
+
+    @property
+    def se(self) -> float:
+        return self._result.params.se
+
+    @property
+    def ci_lower(self) -> float:
+        return self._result.params.ci_lower
+
+    @property
+    def ci_upper(self) -> float:
+        return self._result.params.ci_upper
+
+    @property
+    def conf_level(self) -> float:
+        return self._result.params.conf_level
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"EC50Solution(estimate={p.estimate:.4g}, "
+            f"ci=[{p.ci_lower:.4g}, {p.ci_upper:.4g}], "
+            f"conf_level={p.conf_level})"
+        )
+
+
 @dataclass(frozen=True)
-class RelativePotencyResult:
-    """Relative potency (ratio of EC50s) with Fieller's CI."""
+class RelativePotencyParams:
+    """Computed payload of relative potency (ratio of EC50s) with Fieller's CI."""
 
     ratio: float
     ci_lower: float
@@ -43,16 +106,74 @@ class RelativePotencyResult:
     method: str  # 'fieller'
 
 
+class RelativePotencySolution(SolutionReprMixin):
+    """Public result of relative potency — wraps ``Result[RelativePotencyParams]``.
+
+    Exposes every output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[RelativePotencyParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- Relative potency outputs (from the payload) ---
+    @property
+    def ratio(self) -> float:
+        return self._result.params.ratio
+
+    @property
+    def ci_lower(self) -> float:
+        return self._result.params.ci_lower
+
+    @property
+    def ci_upper(self) -> float:
+        return self._result.params.ci_upper
+
+    @property
+    def conf_level(self) -> float:
+        return self._result.params.conf_level
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"RelativePotencySolution(ratio={p.ratio:.4g}, "
+            f"ci=[{p.ci_lower:.4g}, {p.ci_upper:.4g}], "
+            f"conf_level={p.conf_level})"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def ec50(
-    fit_result: DoseResponseResult,
+    fit_result: DoseResponseSolution,
     *,
     conf_level: float = 0.95,
     method: str = "delta",
-) -> EC50Result:
+) -> EC50Solution:
     """Extract EC50 with confidence interval from a fitted model.
 
     For models where EC50 is a direct parameter (LL.4, LL.5, W1.4, W2.4,
@@ -62,7 +183,7 @@ def ec50(
 
     Parameters
     ----------
-    fit_result : DoseResponseResult
+    fit_result : DoseResponseSolution
         A fitted dose-response model.
     conf_level : float
         Confidence level (default 0.95).
@@ -71,7 +192,7 @@ def ec50(
 
     Returns
     -------
-    EC50Result
+    EC50Solution
 
     Validates against: R drc::ED()
     """
@@ -102,7 +223,7 @@ def ec50(
         ci_lower = float("nan")
         ci_upper = float("nan")
 
-    return EC50Result(
+    params = EC50Params(
         estimate=ec50_val,
         se=se_ec50,
         ci_lower=ci_lower,
@@ -110,14 +231,21 @@ def ec50(
         conf_level=conf_level,
         method=method,
     )
+    result = Result(
+        params=params,
+        info={"conf_level": conf_level, "method": method},
+        timing=None,
+        backend_name="cpu",
+    )
+    return EC50Solution(result)
 
 
 def relative_potency(
-    fit1: DoseResponseResult,
-    fit2: DoseResponseResult,
+    fit1: DoseResponseSolution,
+    fit2: DoseResponseSolution,
     *,
     conf_level: float = 0.95,
-) -> RelativePotencyResult:
+) -> RelativePotencySolution:
     """Relative potency: ratio of EC50s between two curves with Fieller's CI.
 
     Computes ``rho = EC50_2 / EC50_1`` with a confidence interval based on
@@ -125,16 +253,16 @@ def relative_potency(
 
     Parameters
     ----------
-    fit1 : DoseResponseResult
+    fit1 : DoseResponseSolution
         First fitted model (reference).
-    fit2 : DoseResponseResult
+    fit2 : DoseResponseSolution
         Second fitted model (test).
     conf_level : float
         Confidence level (default 0.95).
 
     Returns
     -------
-    RelativePotencyResult
+    RelativePotencySolution
 
     Validates against: R drc::compParm(), drc::EDcomp()
     """
@@ -170,10 +298,17 @@ def relative_potency(
             ci_lower = float((num_center - np.sqrt(D)) / denom)
             ci_upper = float((num_center + np.sqrt(D)) / denom)
 
-    return RelativePotencyResult(
+    params = RelativePotencyParams(
         ratio=ratio,
         ci_lower=ci_lower,
         ci_upper=ci_upper,
         conf_level=conf_level,
         method="fieller",
     )
+    result = Result(
+        params=params,
+        info={"conf_level": conf_level, "method": "fieller"},
+        timing=None,
+        backend_name="cpu",
+    )
+    return RelativePotencySolution(result)

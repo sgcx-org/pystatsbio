@@ -16,9 +16,10 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ConvergenceError
+from pystatistics.core.result import Result
 from scipy import optimize, stats
 
-from pystatsbio.meta._common import MetaResult
+from pystatsbio.meta._common import MetaParams, MetaSolution
 from pystatsbio.meta._heterogeneity import cochran_q, h_squared, i_squared
 
 
@@ -29,7 +30,7 @@ def _pool_random(
     tau2_se: float | None,
     method: str,
     conf_level: float,
-) -> MetaResult:
+) -> MetaSolution:
     """Pool studies using random-effects weights for a given tau2.
 
     Parameters
@@ -49,7 +50,7 @@ def _pool_random(
 
     Returns
     -------
-    MetaResult
+    MetaSolution
         Random-effects meta-analysis results.
     """
     k = len(yi)
@@ -70,7 +71,7 @@ def _pool_random(
     H2 = h_squared(Q, k)
     tau = float(np.sqrt(tau2))
 
-    return MetaResult(
+    params = MetaParams(
         estimate=estimate,
         se=se,
         ci_lower=ci_lower,
@@ -92,13 +93,20 @@ def _pool_random(
         yi=yi,
         vi=vi,
     )
+    result = Result(
+        params=params,
+        info={"method": method, "tau2": tau2, "k": k},
+        timing=None,
+        backend_name="cpu",
+    )
+    return MetaSolution(result)
 
 
 def _fit_dl(
     yi: NDArray,
     vi: NDArray,
     conf_level: float,
-) -> MetaResult:
+) -> MetaSolution:
     """DerSimonian-Laird estimator for random-effects meta-analysis.
 
     Closed-form method-of-moments estimator:
@@ -116,7 +124,7 @@ def _fit_dl(
 
     Returns
     -------
-    MetaResult
+    MetaSolution
         DL random-effects results.
     """
     wi = 1.0 / vi
@@ -220,7 +228,7 @@ def _fit_reml(
     yi: NDArray,
     vi: NDArray,
     conf_level: float,
-) -> MetaResult:
+) -> MetaSolution:
     """REML (Restricted Maximum Likelihood) estimator.
 
     Maximizes the restricted log-likelihood over tau2 >= 0 using
@@ -240,7 +248,7 @@ def _fit_reml(
 
     Returns
     -------
-    MetaResult
+    MetaSolution
         REML random-effects results.
 
     Raises
@@ -306,7 +314,7 @@ def _fit_pm(
     yi: NDArray,
     vi: NDArray,
     conf_level: float,
-) -> MetaResult:
+) -> MetaSolution:
     """Paule-Mandel estimator for random-effects meta-analysis.
 
     Iteratively finds tau2 such that Q*(tau2) = k - 1, where
@@ -327,7 +335,7 @@ def _fit_pm(
 
     Returns
     -------
-    MetaResult
+    MetaSolution
         PM random-effects results.
 
     Raises

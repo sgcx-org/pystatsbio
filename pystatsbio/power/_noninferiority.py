@@ -13,7 +13,7 @@ import math
 from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 
 # ---------------------------------------------------------------------------
 # Non-inferiority for means
@@ -46,7 +46,7 @@ def power_noninf_mean(
     alpha: float = 0.025,
     power: float | None = None,
     alternative: str = "one-sided",
-) -> PowerResult:
+) -> PowerSolution:
     """Power for non-inferiority test of means.
 
     Tests H0: treatment - control <= -margin (treatment is inferior)
@@ -73,7 +73,7 @@ def power_noninf_mean(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Validates against: R TrialSize::TwoSampleMean.NIS()
     """
@@ -110,7 +110,7 @@ def power_noninf_mean(
         )
         result_n, result_power = n, power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_delta,
@@ -150,7 +150,7 @@ def power_noninf_prop(
     margin: float = 0.0,
     alpha: float = 0.025,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power for non-inferiority test of proportions.
 
     Exactly one of ``n``, ``power`` must be ``None`` (``prop1`` and ``prop2``
@@ -173,7 +173,7 @@ def power_noninf_prop(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Validates against: R TrialSize::TwoSampleProportion.NIS()
     """
@@ -214,7 +214,7 @@ def power_noninf_prop(
         result_power = _noninf_prop_power(float(n), prop1, prop2, margin, alpha)
         result_n = n
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=delta,
@@ -258,7 +258,7 @@ def power_equiv_mean(
     std: float = 1.0,
     alpha: float = 0.05,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power for equivalence test (TOST) of means.
 
     Tests H01: delta <= -margin AND H02: delta >= +margin.
@@ -283,7 +283,7 @@ def power_equiv_mean(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Validates against: R PowerTOST::power.TOST(), TOSTER
     """
@@ -321,7 +321,7 @@ def power_equiv_mean(
         )
         result_n, result_power = n, power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_delta,
@@ -361,7 +361,7 @@ def power_superiority_mean(
     std: float = 1.0,
     alpha: float = 0.025,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power for superiority test of means.
 
     Tests H0: treatment - control <= margin (no superiority)
@@ -386,7 +386,7 @@ def power_superiority_mean(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Validates against: R TrialSize
     """
@@ -423,7 +423,7 @@ def power_superiority_mean(
         )
         result_n, result_power = n, power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_delta,

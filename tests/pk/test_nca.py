@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.pk import NCAResult, nca
+from pystatsbio.pk import NCASolution, nca
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic PK profiles
@@ -63,7 +63,7 @@ class TestNCABasic:
     def test_returns_nca_result(self, oral_pk):
         time, conc = oral_pk
         r = nca(time, conc, dose=100, route="ev")
-        assert isinstance(r, NCAResult)
+        assert isinstance(r, NCASolution)
 
     def test_cmax_positive(self, oral_pk):
         time, conc = oral_pk

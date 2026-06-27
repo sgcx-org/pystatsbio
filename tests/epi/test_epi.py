@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 
 from pystatsbio.epi import (
-    Epi2x2Result,
+    Epi2x2Solution,
     EpiMeasure,
-    MantelHaenszelResult,
-    StandardizedRate,
+    MantelHaenszelSolution,
+    StandardizedRateSolution,
     epi_2by2,
     mantel_haenszel,
     rate_standardize,
@@ -23,7 +23,7 @@ class TestEpi2by2Basic:
 
     def test_returns_epi2x2result(self):
         result = epi_2by2([[10, 90], [5, 95]])
-        assert isinstance(result, Epi2x2Result)
+        assert isinstance(result, Epi2x2Solution)
 
     def test_all_measures_are_epimeasure(self):
         result = epi_2by2([[10, 90], [5, 95]])
@@ -132,7 +132,7 @@ class TestEpi2by2ZeroCells:
     def test_zero_cell_does_not_raise(self):
         """A table with a zero cell should use 0.5 correction."""
         result = epi_2by2([[0, 100], [10, 90]])
-        assert isinstance(result, Epi2x2Result)
+        assert isinstance(result, Epi2x2Solution)
         # The corrected table should have no zeros
         assert np.all(result.table > 0)
 
@@ -201,7 +201,7 @@ class TestRateStandardizeDirect:
 
     def test_returns_standardized_rate(self, example_data):
         result = rate_standardize(*example_data, method="direct")
-        assert isinstance(result, StandardizedRate)
+        assert isinstance(result, StandardizedRateSolution)
 
     def test_method_is_direct(self, example_data):
         result = rate_standardize(*example_data, method="direct")
@@ -259,7 +259,7 @@ class TestRateStandardizeIndirect:
 
     def test_returns_standardized_rate(self, example_data):
         result = rate_standardize(*example_data, method="indirect")
-        assert isinstance(result, StandardizedRate)
+        assert isinstance(result, StandardizedRateSolution)
 
     def test_method_is_indirect(self, example_data):
         result = rate_standardize(*example_data, method="indirect")
@@ -337,7 +337,7 @@ class TestMantelHaenszelBasic:
 
     def test_returns_result(self, three_strata):
         result = mantel_haenszel(three_strata)
-        assert isinstance(result, MantelHaenszelResult)
+        assert isinstance(result, MantelHaenszelSolution)
 
     def test_pooled_is_epimeasure(self, three_strata):
         result = mantel_haenszel(three_strata)

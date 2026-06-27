@@ -13,9 +13,10 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.diagnostic._common import DiagnosticResult
+from pystatsbio.diagnostic._common import DiagnosticParams, DiagnosticSolution
 
 # ---------------------------------------------------------------------------
 # CI helpers for binomial proportions
@@ -78,7 +79,7 @@ def diagnostic_accuracy(
     prevalence: float | None = None,
     conf_level: float = 0.95,
     ci_method: str = "clopper-pearson",
-) -> DiagnosticResult:
+) -> DiagnosticSolution:
     """Compute diagnostic accuracy metrics at a fixed cutoff.
 
     Parameters
@@ -104,7 +105,7 @@ def diagnostic_accuracy(
 
     Returns
     -------
-    DiagnosticResult
+    DiagnosticSolution
 
     Validates against: R ``epiR::epi.tests()``
     """
@@ -176,7 +177,7 @@ def diagnostic_accuracy(
     dor_lo = np.exp(np.log(dor) - z * log_dor_se)
     dor_hi = np.exp(np.log(dor) + z * log_dor_se)
 
-    return DiagnosticResult(
+    params = DiagnosticParams(
         cutoff=float(cutoff),
         sensitivity=float(sens),
         sensitivity_ci=sens_ci,
@@ -192,3 +193,15 @@ def diagnostic_accuracy(
         conf_level=conf_level,
         method=ci_method,
     )
+    result = Result(
+        params=params,
+        info={
+            "cutoff": float(cutoff),
+            "direction": direction,
+            "ci_method": ci_method,
+            "conf_level": conf_level,
+        },
+        timing=None,
+        backend_name="cpu",
+    )
+    return DiagnosticSolution(result)

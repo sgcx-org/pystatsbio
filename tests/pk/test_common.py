@@ -1,4 +1,4 @@
-"""Tests for pk/_common.py: NCAResult fields and summary()."""
+"""Tests for pk/_common.py: NCASolution fields and summary()."""
 
 import numpy as np
 import pytest
@@ -34,11 +34,11 @@ def nca_no_dose():
 
 
 # ---------------------------------------------------------------------------
-# NCAResult fields
+# NCASolution fields
 # ---------------------------------------------------------------------------
 
 class TestNCAResultFields:
-    """All fields of NCAResult have sensible values."""
+    """All fields of NCASolution have sensible values."""
 
     def test_cmax_positive(self, nca_iv):
         assert nca_iv.cmax > 0.0
@@ -96,17 +96,18 @@ class TestNCAResultFields:
     def test_n_terminal_positive(self, nca_iv):
         assert nca_iv.n_terminal >= 3
 
-    def test_frozen(self, nca_iv):
+    def test_read_only(self, nca_iv):
+        """Public attributes are read-only properties on the Solution."""
         with pytest.raises(AttributeError):
             nca_iv.cmax = 0.0  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
-# NCAResult.summary()
+# NCASolution.summary()
 # ---------------------------------------------------------------------------
 
 class TestNCAResultSummary:
-    """NCAResult.summary() output."""
+    """NCASolution.summary() output."""
 
     def test_summary_is_string(self, nca_iv):
         assert isinstance(nca_iv.summary(), str)

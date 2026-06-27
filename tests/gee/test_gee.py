@@ -10,7 +10,6 @@ import pytest
 
 from pystatsbio.gee import (
     AR1Corr,
-    CorrStructure,
     ExchangeableCorr,
     GEESolution,
     IndependenceCorr,

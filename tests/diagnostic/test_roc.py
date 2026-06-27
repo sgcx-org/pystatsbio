@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import ROCResult, roc
+from pystatsbio.diagnostic import ROCSolution, roc
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -42,7 +42,7 @@ class TestROCBasic:
 
     def test_returns_roc_result(self, well_separated):
         r = roc(*well_separated)
-        assert isinstance(r, ROCResult)
+        assert isinstance(r, ROCSolution)
 
     def test_auc_high_for_separation(self, well_separated):
         r = roc(*well_separated)

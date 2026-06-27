@@ -9,11 +9,12 @@ Phase 1: NCA only. Compartmental/PopPK is Phase 4+.
 Validates against: R packages PKNCA, NonCompart.
 """
 
-from pystatsbio.pk._common import NCAResult
+from pystatsbio.pk._common import NCAParams, NCASolution
 from pystatsbio.pk._nca import LambdaZEstimationError, nca
 
 __all__ = [
-    "NCAResult",
+    "NCASolution",
+    "NCAParams",
     "LambdaZEstimationError",
     "nca",
 ]

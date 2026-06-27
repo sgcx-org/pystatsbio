@@ -1,17 +1,23 @@
-"""Tests for power/_common.py: PowerResult, _check_power_args, _solve_parameter."""
+"""Tests for power/_common.py: PowerSolution, _check_power_args, _solve_parameter."""
 
 import math
 
 import pytest
+from pystatistics.core.result import Result
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import (
+    PowerParams,
+    PowerSolution,
+    _check_power_args,
+    _solve_parameter,
+)
 
 # ---------------------------------------------------------------------------
-# PowerResult
+# PowerSolution
 # ---------------------------------------------------------------------------
 
-class TestPowerResult:
-    """PowerResult dataclass and summary()."""
+class TestPowerSolution:
+    """PowerSolution wrapper: value accessors and summary()."""
 
     def _make(self, **kwargs):
         defaults = dict(
@@ -20,7 +26,11 @@ class TestPowerResult:
             method="Two-sample t-test power calculation",
         )
         defaults.update(kwargs)
-        return PowerResult(**defaults)
+        params = PowerParams(**defaults)
+        result = Result(
+            params=params, info={}, timing=None, backend_name="cpu"
+        )
+        return PowerSolution(result)
 
     def test_fields_stored(self):
         r = self._make()
@@ -31,6 +41,7 @@ class TestPowerResult:
         assert r.alternative == "two-sided"
 
     def test_frozen(self):
+        # PowerSolution exposes read-only properties (no setters).
         r = self._make()
         with pytest.raises(AttributeError):
             r.n = 100  # type: ignore[misc]

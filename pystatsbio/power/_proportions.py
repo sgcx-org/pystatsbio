@@ -10,7 +10,7 @@ import math
 from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 
 _VALID_ALTERNATIVES = ("two-sided", "less", "greater")
 
@@ -55,7 +55,7 @@ def power_prop_test(
     alpha: float = 0.05,
     power: float | None = None,
     alternative: str = "two-sided",
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for two-proportion z-test (chi-squared test).
 
     Exactly one of ``n``, ``effect_size``, ``power`` must be ``None``.
@@ -75,7 +75,7 @@ def power_prop_test(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -137,7 +137,7 @@ def power_prop_test(
         result_n = n
         result_power = power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_effect_size,
@@ -155,7 +155,7 @@ def power_fisher_test(
     alpha: float = 0.05,
     power: float | None = None,
     alternative: str = "two-sided",
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for Fisher's exact test (normal approximation).
 
     Uses the arcsine (Cohen's h) normal approximation. For exact power
@@ -182,7 +182,7 @@ def power_fisher_test(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Validates against: R pwr::pwr.2p.test() (via Cohen's h)
     """
@@ -205,7 +205,7 @@ def power_fisher_test(
         n=n, effect_size=h, alpha=alpha, power=power, alternative=alternative
     )
 
-    return PowerResult(
+    return _solution(
         n=result.n,
         power=result.power,
         effect_size=h,

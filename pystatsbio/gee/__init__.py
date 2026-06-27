@@ -24,10 +24,10 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from pystatistics.core.exceptions import ValidationError
-from pystatistics.regression.families import Family, resolve_family
+from pystatistics.core.result import Result
+from pystatistics.regression.families import resolve_family
 from scipy import stats
 
-from pystatistics.core.result import Result
 from pystatsbio.gee._common import GEEParams, GEESolution
 from pystatsbio.gee._correlation import (
     AR1Corr,

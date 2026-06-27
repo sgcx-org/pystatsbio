@@ -14,9 +14,14 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 from scipy.optimize import least_squares
 
-from pystatsbio.doseresponse._common import CurveParams, DoseResponseResult
+from pystatsbio.doseresponse._common import (
+    CurveParams,
+    DoseResponseParams,
+    DoseResponseSolution,
+)
 from pystatsbio.doseresponse._models import _JAC_LOG_MAP, _MODEL_MAP, VALID_MODELS
 
 # ---------------------------------------------------------------------------
@@ -195,7 +200,7 @@ def fit_drm(
     start: dict[str, float] | None = None,
     lower: dict[str, float] | None = None,
     upper: dict[str, float] | None = None,
-) -> DoseResponseResult:
+) -> DoseResponseSolution:
     """Fit a dose-response model to a single curve.
 
     Uses Trust Region Reflective nonlinear least squares
@@ -219,7 +224,7 @@ def fit_drm(
 
     Returns
     -------
-    DoseResponseResult
+    DoseResponseSolution
 
     Examples
     --------
@@ -374,8 +379,8 @@ def fit_drm(
 
     curve_params = CurveParams.from_array(popt, model)
 
-    return DoseResponseResult(
-        params=curve_params,
+    params = DoseResponseParams(
+        curve=curve_params,
         se=se,
         residuals=res_vec,
         rss=rss,
@@ -389,3 +394,14 @@ def fit_drm(
         n_obs=n_obs,
         jac=jac,
     )
+    result = Result(
+        params=params,
+        info={
+            "model": model,
+            "n_obs": n_obs,
+            "converged": converged,
+        },
+        timing=None,
+        backend_name="cpu",
+    )
+    return DoseResponseSolution(result)

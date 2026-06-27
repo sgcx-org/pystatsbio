@@ -1,4 +1,4 @@
-"""Tests for doseresponse/_common.py: CurveParams, DoseResponseResult, BatchDoseResponseResult."""
+"""Tests for doseresponse/_common.py: CurveParams, DoseResponseSolution, BatchDoseResponseSolution."""
 
 import numpy as np
 import pytest
@@ -105,11 +105,11 @@ class TestCurveParams:
 
 
 # ---------------------------------------------------------------------------
-# DoseResponseResult (via fit_drm)
+# DoseResponseSolution (via fit_drm)
 # ---------------------------------------------------------------------------
 
-class TestDoseResponseResult:
-    """DoseResponseResult fields and summary()."""
+class TestDoseResponseSolution:
+    """DoseResponseSolution fields and summary()."""
 
     def test_params_type(self, fitted_ll4):
         assert isinstance(fitted_ll4.params, CurveParams)

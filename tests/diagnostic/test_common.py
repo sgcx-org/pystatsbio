@@ -1,4 +1,4 @@
-"""Tests for diagnostic/_common.py: ROCResult.summary() and DiagnosticResult.summary()."""
+"""Tests for diagnostic/_common.py: ROCSolution.summary() and DiagnosticSolution.summary()."""
 
 import numpy as np
 import pytest
@@ -32,11 +32,11 @@ def diag_result():
 
 
 # ---------------------------------------------------------------------------
-# ROCResult
+# ROCSolution
 # ---------------------------------------------------------------------------
 
 class TestROCResult:
-    """ROCResult fields and summary()."""
+    """ROCSolution fields and summary()."""
 
     def test_auc_in_range(self, roc_result):
         assert 0.0 <= roc_result.auc <= 1.0
@@ -91,11 +91,11 @@ class TestROCResult:
 
 
 # ---------------------------------------------------------------------------
-# DiagnosticResult
+# DiagnosticSolution
 # ---------------------------------------------------------------------------
 
 class TestDiagnosticResult:
-    """DiagnosticResult fields and summary()."""
+    """DiagnosticSolution fields and summary()."""
 
     def test_sensitivity_in_range(self, diag_result):
         assert 0.0 <= diag_result.sensitivity <= 1.0

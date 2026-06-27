@@ -28,9 +28,10 @@ import contextlib
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ConvergenceError, ValidationError
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.pk._common import NCAResult
+from pystatsbio.pk._common import NCAParams, NCASolution
 
 # ---------------------------------------------------------------------------
 # Input validation
@@ -374,7 +375,7 @@ def nca(
     route: str = "ev",
     auc_method: str = "linear-up/log-down",
     lambda_z_n_points: int | None = None,
-) -> NCAResult:
+) -> NCASolution:
     """Non-compartmental pharmacokinetic analysis.
 
     Parameters
@@ -399,8 +400,10 @@ def nca(
 
     Returns
     -------
-    NCAResult
-        Frozen dataclass with all NCA parameters.
+    NCASolution
+        Solution wrapping all NCA parameters (AUC, Cmax/Tmax, half-life,
+        clearance, volume of distribution, and a summary method), with the
+        uniform .backend_name/.timing/.warnings/.info accessors.
 
     Notes
     -----
@@ -419,7 +422,7 @@ def nca(
     idx_last = _find_last_measurable(concentration)
     if idx_last < 0:
         # All concentrations zero — degenerate case
-        return NCAResult(
+        params = NCAParams(
             auc_last=0.0,
             auc_inf=None,
             auc_pct_extrap=None,
@@ -436,6 +439,20 @@ def nca(
             n_points=n_points,
             n_terminal=0,
         )
+        result = Result(
+            params=params,
+            info={
+                "route": route,
+                "auc_method": auc_method,
+                "n_points": n_points,
+                "lambda_z_estimated": False,
+                "n_terminal": 0,
+                "degenerate": "all concentrations zero",
+            },
+            timing=None,
+            backend_name="cpu",
+        )
+        return NCASolution(result)
 
     # AUC from time[0] to time[idx_last]
     t_auc = time[: idx_last + 1]
@@ -473,7 +490,7 @@ def nca(
             clearance = dose / auc_inf
             vz = dose / (lambda_z * auc_inf)
 
-    return NCAResult(
+    params = NCAParams(
         auc_last=auc_last,
         auc_inf=auc_inf,
         auc_pct_extrap=auc_pct_extrap,
@@ -490,3 +507,17 @@ def nca(
         n_points=n_points,
         n_terminal=n_terminal,
     )
+    result = Result(
+        params=params,
+        info={
+            "route": route,
+            "auc_method": auc_method,
+            "n_points": n_points,
+            "lambda_z_estimated": lambda_z is not None,
+            "lambda_z_n_terminal": n_terminal,
+            "lambda_z_r_squared": r_sq_adj,
+        },
+        timing=None,
+        backend_name="cpu",
+    )
+    return NCASolution(result)

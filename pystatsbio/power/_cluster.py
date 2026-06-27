@@ -11,7 +11,7 @@ import math
 
 from pystatistics.core.exceptions import ValidationError
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 from pystatsbio.power._means import _t_test_power
 
 # ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ def power_cluster(
     icc: float = 0.05,
     alpha: float = 0.05,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for cluster randomized trial (two-arm parallel design).
 
     Adjusts individual-level sample size by the design effect:
@@ -80,7 +80,7 @@ def power_cluster(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -133,7 +133,7 @@ def power_cluster(
         result_n = n_clusters
         result_power = power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_effect_size,

@@ -13,9 +13,13 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.epi._common import StandardizedRate
+from pystatsbio.epi._common import (
+    StandardizedRateParams,
+    StandardizedRateSolution,
+)
 
 
 def _validate_arrays(
@@ -58,7 +62,7 @@ def _direct_standardize(
     person_time: np.ndarray,
     standard_pop: np.ndarray,
     conf_level: float,
-) -> StandardizedRate:
+) -> StandardizedRateParams:
     """Direct age standardization.
 
     adjusted_rate = sum(rate_i * weight_i) / sum(weight_i)
@@ -91,7 +95,7 @@ def _direct_standardize(
     ci_lower = adjusted_rate - z * se
     ci_upper = adjusted_rate + z * se
 
-    return StandardizedRate(
+    return StandardizedRateParams(
         crude_rate=crude_rate,
         adjusted_rate=adjusted_rate,
         adjusted_rate_ci=(float(ci_lower), float(ci_upper)),
@@ -107,7 +111,7 @@ def _indirect_standardize(
     person_time: np.ndarray,
     standard_rates: np.ndarray,
     conf_level: float,
-) -> StandardizedRate:
+) -> StandardizedRateParams:
     """Indirect age standardization.
 
     expected = sum(standard_rate_i * person_time_i)
@@ -151,7 +155,7 @@ def _indirect_standardize(
     adj_ci_lower = sir_lower * overall_standard_rate
     adj_ci_upper = sir_upper * overall_standard_rate
 
-    return StandardizedRate(
+    return StandardizedRateParams(
         crude_rate=crude_rate,
         adjusted_rate=adjusted_rate,
         adjusted_rate_ci=(float(adj_ci_lower), float(adj_ci_upper)),
@@ -173,7 +177,7 @@ def rate_standardize(
     *,
     method: str = "direct",
     conf_level: float = 0.95,
-) -> StandardizedRate:
+) -> StandardizedRateSolution:
     """Age-standardize rates using direct or indirect method.
 
     Direct standardization:
@@ -206,7 +210,7 @@ def rate_standardize(
 
     Returns
     -------
-    StandardizedRate
+    StandardizedRateSolution
 
     Raises
     ------
@@ -228,6 +232,14 @@ def rate_standardize(
     _validate_arrays(c, pt, sp)
 
     if method == "direct":
-        return _direct_standardize(c, pt, sp, conf_level)
+        params = _direct_standardize(c, pt, sp, conf_level)
     else:
-        return _indirect_standardize(c, pt, sp, conf_level)
+        params = _indirect_standardize(c, pt, sp, conf_level)
+
+    result = Result(
+        params=params,
+        info={"method": method, "conf_level": conf_level},
+        timing=None,
+        backend_name="cpu",
+    )
+    return StandardizedRateSolution(result)

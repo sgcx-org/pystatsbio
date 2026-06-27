@@ -13,7 +13,7 @@ from pystatistics.core.exceptions import ValidationError
 from scipy.stats import nct, norm
 from scipy.stats import t as t_dist
 
-from pystatsbio.power._common import PowerResult, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _solution, _solve_parameter
 
 # ---------------------------------------------------------------------------
 # Internal power computation
@@ -106,7 +106,7 @@ def power_crossover_be(
     theta0: float = 0.95,
     alpha: float = 0.05,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power for 2x2 crossover bioequivalence study (TOST on log-scale).
 
     Standard average bioequivalence (ABE) design.
@@ -134,7 +134,7 @@ def power_crossover_be(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -185,7 +185,7 @@ def power_crossover_be(
         result_power = _crossover_be_power(float(n), coef_variation, theta0, theta1, theta2, alpha)
         result_n = n
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=coef_variation,  # report CV as the "effect size" metric

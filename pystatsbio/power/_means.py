@@ -11,7 +11,7 @@ from pystatistics.core.exceptions import ValidationError
 from scipy.stats import nct, norm
 from scipy.stats import t as t_dist
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 
 _VALID_TYPES = ("two-sample", "one-sample", "paired")
 _VALID_ALTERNATIVES = ("two-sided", "less", "greater")
@@ -113,7 +113,7 @@ def power_t_test(
     power: float | None = None,
     alternative: str = "two-sided",
     test_type: str = "two-sample",
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for t-tests.
 
     Exactly one of ``n``, ``effect_size``, ``power`` must be ``None`` — that
@@ -136,7 +136,7 @@ def power_t_test(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -223,7 +223,7 @@ def power_t_test(
     method = f"{type_labels[test_type]} t test power calculation"
     note = "n is number in *each* group" if test_type == "two-sample" else ""
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_effect_size,
@@ -240,7 +240,7 @@ def power_paired_t_test(
     alpha: float = 0.05,
     power: float | None = None,
     alternative: str = "two-sided",
-) -> PowerResult:
+) -> PowerSolution:
     """Convenience wrapper: ``power_t_test`` with ``test_type='paired'``.
 
     Validates against: R pwr::pwr.t.test(type='paired')

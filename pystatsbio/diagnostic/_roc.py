@@ -21,17 +21,18 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 from scipy import stats
 
-from pystatsbio.diagnostic._common import ROCResult
+from pystatsbio.diagnostic._common import ROCParams, ROCSolution
 
 # ---------------------------------------------------------------------------
-# ROCTestResult
+# ROCTest result types
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
-class ROCTestResult:
-    """Result of comparing two correlated ROC curves (DeLong test)."""
+class ROCTestParams:
+    """Computed payload of comparing two correlated ROC curves (DeLong test)."""
 
     statistic: float
     p_value: float
@@ -40,17 +41,79 @@ class ROCTestResult:
     auc_diff: float
     method: str  # 'delong'
 
+
+class ROCTestSolution(SolutionReprMixin):
+    """Public result of the DeLong test — wraps ``Result[ROCTestParams]``.
+
+    Exposes every output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[ROCTestParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- Test outputs (from the payload) ---
+    @property
+    def statistic(self) -> float:
+        return self._result.params.statistic
+
+    @property
+    def p_value(self) -> float:
+        return self._result.params.p_value
+
+    @property
+    def auc1(self) -> float:
+        return self._result.params.auc1
+
+    @property
+    def auc2(self) -> float:
+        return self._result.params.auc2
+
+    @property
+    def auc_diff(self) -> float:
+        return self._result.params.auc_diff
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
     def summary(self) -> str:
+        p = self._result.params
         lines = [
             "DeLong Test for Two Correlated ROC Curves",
             "=" * 45,
-            f"AUC 1     : {self.auc1:.4f}",
-            f"AUC 2     : {self.auc2:.4f}",
-            f"Difference: {self.auc_diff:.4f}",
-            f"Z         : {self.statistic:.4f}",
-            f"p-value   : {self.p_value:.4g}",
+            f"AUC 1     : {p.auc1:.4f}",
+            f"AUC 2     : {p.auc2:.4f}",
+            f"Difference: {p.auc_diff:.4f}",
+            f"Z         : {p.statistic:.4f}",
+            f"p-value   : {p.p_value:.4g}",
         ]
         return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"ROCTestSolution(auc1={p.auc1:.4f}, auc2={p.auc2:.4f}, "
+            f"p_value={p.p_value:.4g})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +242,7 @@ def roc(
     *,
     direction: str = "auto",
     conf_level: float = 0.95,
-) -> ROCResult:
+) -> ROCSolution:
     """Compute empirical ROC curve with DeLong AUC confidence interval.
 
     Parameters
@@ -197,7 +260,7 @@ def roc(
 
     Returns
     -------
-    ROCResult
+    ROCSolution
 
     Validates against: R ``pROC::roc()``, ``pROC::ci.auc()``
     """
@@ -225,7 +288,7 @@ def roc(
         response, predictor, direction,
     )
 
-    return ROCResult(
+    params = ROCParams(
         thresholds=thresholds,
         tpr=tpr,
         fpr=fpr,
@@ -238,6 +301,18 @@ def roc(
         n_negative=n0,
         direction=direction,
     )
+    result = Result(
+        params=params,
+        info={
+            "direction": direction,
+            "conf_level": conf_level,
+            "n_positive": n1,
+            "n_negative": n0,
+        },
+        timing=None,
+        backend_name="cpu",
+    )
+    return ROCSolution(result)
 
 
 def _empirical_roc_curve(
@@ -296,14 +371,14 @@ def _empirical_roc_curve(
 # ---------------------------------------------------------------------------
 
 def roc_test(
-    roc1: ROCResult,
-    roc2: ROCResult,
+    roc1: ROCSolution,
+    roc2: ROCSolution,
     *,
     predictor1: NDArray[np.floating] | None = None,
     predictor2: NDArray[np.floating] | None = None,
     response: NDArray[np.integer] | None = None,
     method: str = "delong",
-) -> ROCTestResult:
+) -> ROCTestSolution:
     """Compare two correlated ROC curves using DeLong's test.
 
     The two ROC curves must be computed on the **same** subjects (same
@@ -312,7 +387,7 @@ def roc_test(
 
     Parameters
     ----------
-    roc1, roc2 : ROCResult
+    roc1, roc2 : ROCSolution
         Two ROC curves computed on the same subjects.
     predictor1, predictor2 : array of float
         Original predictor values for each marker.
@@ -323,7 +398,7 @@ def roc_test(
 
     Returns
     -------
-    ROCTestResult
+    ROCTestSolution
 
     Validates against: R ``pROC::roc.test()``
     """
@@ -371,7 +446,7 @@ def roc_test(
     z_stat = (auc1 - auc2) / np.sqrt(var_diff)
     p_value = 2 * stats.norm.sf(abs(z_stat))
 
-    return ROCTestResult(
+    params = ROCTestParams(
         statistic=float(z_stat),
         p_value=float(p_value),
         auc1=auc1,
@@ -379,3 +454,10 @@ def roc_test(
         auc_diff=auc1 - auc2,
         method="delong",
     )
+    result = Result(
+        params=params,
+        info={"method": "delong"},
+        timing=None,
+        backend_name="cpu",
+    )
+    return ROCTestSolution(result)

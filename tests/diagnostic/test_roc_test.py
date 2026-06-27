@@ -3,14 +3,13 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import ROCTestResult, roc, roc_test
+from pystatsbio.diagnostic import ROCTestSolution, roc, roc_test
 
 
 @pytest.fixture
 def two_markers():
     """Two markers on the same subjects: one strong, one weak."""
     np.random.seed(42)
-    n = 200
     response = np.array([0] * 100 + [1] * 100)
     # Strong marker
     pred1 = np.concatenate([
@@ -33,7 +32,7 @@ class TestROCTest:
         r1 = roc(response, pred1)
         r2 = roc(response, pred2)
         t = roc_test(r1, r2, predictor1=pred1, predictor2=pred2, response=response)
-        assert isinstance(t, ROCTestResult)
+        assert isinstance(t, ROCTestSolution)
 
     def test_significant_difference(self, two_markers):
         """Strong vs weak marker should give small p-value."""

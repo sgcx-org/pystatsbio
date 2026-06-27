@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import BatchAUCResult, batch_auc, roc
+from pystatsbio.diagnostic import BatchAUCSolution, batch_auc, roc
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -33,7 +33,7 @@ class TestBatchCPU:
     def test_returns_result(self, batch_data):
         response, predictors = batch_data
         r = batch_auc(response, predictors, backend="cpu")
-        assert isinstance(r, BatchAUCResult)
+        assert isinstance(r, BatchAUCSolution)
 
     def test_n_markers(self, batch_data):
         response, predictors = batch_data

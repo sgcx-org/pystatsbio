@@ -19,8 +19,12 @@ import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.compute.backend import resolve_backend
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 
-from pystatsbio.doseresponse._common import BatchDoseResponseResult
+from pystatsbio.doseresponse._common import (
+    BatchDoseResponseParams,
+    BatchDoseResponseSolution,
+)
 
 if TYPE_CHECKING:
     import torch
@@ -35,7 +39,7 @@ def _batch_cpu(
     model: str,
     max_iter: int,
     tol: float,
-) -> BatchDoseResponseResult:
+) -> BatchDoseResponseSolution:
     """Fit each compound sequentially on CPU via :func:`fit_drm`."""
     from pystatsbio.doseresponse._fit import fit_drm
 
@@ -63,10 +67,17 @@ def _batch_cpu(
             ec50[i] = hill[i] = top[i] = bottom[i] = rss[i] = np.nan
             converged[i] = False
 
-    return BatchDoseResponseResult(
+    params = BatchDoseResponseParams(
         ec50=ec50, hill=hill, top=top, bottom=bottom,
         converged=converged, rss=rss, n_compounds=K,
     )
+    result = Result(
+        params=params,
+        info={"model": model, "n_compounds": K},
+        timing=None,
+        backend_name="cpu",
+    )
+    return BatchDoseResponseSolution(result)
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +92,7 @@ def _batch_gpu(
     *,
     device_type: str,
     use_fp64: bool,
-) -> BatchDoseResponseResult:
+) -> BatchDoseResponseSolution:
     """Batched Levenberg-Marquardt for LL.4 on a GPU.
 
     Parameters are ``[bottom, top, log_ec50, hill]`` — log-scale EC50
@@ -198,7 +209,7 @@ def _batch_gpu(
 
     ec50_out = torch.exp(theta[:, 2])
 
-    return BatchDoseResponseResult(
+    params = BatchDoseResponseParams(
         ec50=ec50_out.cpu().numpy(),
         hill=theta[:, 3].cpu().numpy(),
         top=theta[:, 1].cpu().numpy(),
@@ -207,6 +218,13 @@ def _batch_gpu(
         rss=rss_final.cpu().numpy(),
         n_compounds=K,
     )
+    result = Result(
+        params=params,
+        info={"n_compounds": K, "device_type": device_type, "use_fp64": use_fp64},
+        timing=None,
+        backend_name=f"fit_drm_batch_gpu ({device_type})",
+    )
+    return BatchDoseResponseSolution(result)
 
 
 def _batch_init_gpu(
@@ -268,7 +286,7 @@ def fit_drm_batch(
     backend: str = "auto",
     max_iter: int = 100,
     tol: float = 1e-8,
-) -> BatchDoseResponseResult:
+) -> BatchDoseResponseSolution:
     """Batch-fit dose-response curves across many compounds.
 
     Parameters
@@ -292,7 +310,7 @@ def fit_drm_batch(
 
     Returns
     -------
-    BatchDoseResponseResult
+    BatchDoseResponseSolution
 
     Notes
     -----

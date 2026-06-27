@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.meta._common import MetaResult
+from pystatsbio.meta._common import MetaParams, MetaSolution
 from pystatsbio.meta._heterogeneity import cochran_q, h_squared, i_squared
 
 
@@ -20,7 +21,7 @@ def _fit_fixed(
     yi: NDArray,
     vi: NDArray,
     conf_level: float,
-) -> MetaResult:
+) -> MetaSolution:
     """Fixed-effects meta-analysis.
 
     Weights: w_i = 1 / v_i
@@ -39,7 +40,7 @@ def _fit_fixed(
 
     Returns
     -------
-    MetaResult
+    MetaSolution
         Fixed-effects meta-analysis results.
     """
     k = len(yi)
@@ -59,7 +60,7 @@ def _fit_fixed(
     I2 = i_squared(Q, k)
     H2 = h_squared(Q, k)
 
-    return MetaResult(
+    params = MetaParams(
         estimate=estimate,
         se=se,
         ci_lower=ci_lower,
@@ -81,3 +82,10 @@ def _fit_fixed(
         yi=yi,
         vi=vi,
     )
+    result = Result(
+        params=params,
+        info={"method": "FE", "tau2": 0.0, "k": k},
+        timing=None,
+        backend_name="cpu",
+    )
+    return MetaSolution(result)

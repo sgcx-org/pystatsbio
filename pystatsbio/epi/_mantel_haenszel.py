@@ -12,9 +12,14 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.epi._common import EpiMeasure, MantelHaenszelResult
+from pystatsbio.epi._common import (
+    EpiMeasure,
+    MantelHaenszelParams,
+    MantelHaenszelSolution,
+)
 
 
 def _validate_tables(tables: np.ndarray) -> np.ndarray:
@@ -61,7 +66,6 @@ def _mh_odds_ratio(
     Robins-Breslow-Greenland variance:
         var(ln(MH_OR)) computed from the R, S, P, Q sums.
     """
-    k = tables.shape[0]
     a = tables[:, 0, 0]
     b = tables[:, 0, 1]
     c = tables[:, 1, 0]
@@ -313,7 +317,7 @@ def mantel_haenszel(
     *,
     measure: str = "odds-ratio",
     conf_level: float = 0.95,
-) -> MantelHaenszelResult:
+) -> MantelHaenszelSolution:
     """Mantel-Haenszel stratified analysis for pooled OR or RR.
 
     Pools effect measures across K strata of 2x2 tables, tests for
@@ -333,7 +337,7 @@ def mantel_haenszel(
 
     Returns
     -------
-    MantelHaenszelResult
+    MantelHaenszelSolution
 
     Raises
     ------
@@ -369,7 +373,7 @@ def mantel_haenszel(
     else:
         bd_stat, bd_p = None, None
 
-    return MantelHaenszelResult(
+    params = MantelHaenszelParams(
         pooled_estimate=pooled,
         cmh_statistic=cmh_chi2,
         cmh_p_value=cmh_p,
@@ -378,3 +382,10 @@ def mantel_haenszel(
         n_strata=int(tbl.shape[0]),
         measure=measure,
     )
+    result = Result(
+        params=params,
+        info={"measure": measure, "conf_level": conf_level},
+        timing=None,
+        backend_name="cpu",
+    )
+    return MantelHaenszelSolution(result)

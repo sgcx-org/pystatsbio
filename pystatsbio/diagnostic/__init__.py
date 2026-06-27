@@ -8,17 +8,32 @@ Validates against: R packages pROC, OptimalCutpoints, epiR.
 """
 
 from pystatsbio.diagnostic._accuracy import diagnostic_accuracy
-from pystatsbio.diagnostic._batch import BatchAUCResult, batch_auc
-from pystatsbio.diagnostic._common import DiagnosticResult, ROCResult
-from pystatsbio.diagnostic._cutoff import CutoffResult, optimal_cutoff
-from pystatsbio.diagnostic._roc import ROCTestResult, roc, roc_test
+from pystatsbio.diagnostic._batch import BatchAUCParams, BatchAUCSolution, batch_auc
+from pystatsbio.diagnostic._common import (
+    DiagnosticParams,
+    DiagnosticSolution,
+    ROCParams,
+    ROCSolution,
+)
+from pystatsbio.diagnostic._cutoff import CutoffParams, CutoffSolution, optimal_cutoff
+from pystatsbio.diagnostic._roc import (
+    ROCTestParams,
+    ROCTestSolution,
+    roc,
+    roc_test,
+)
 
 __all__ = [
-    "ROCResult",
-    "DiagnosticResult",
-    "ROCTestResult",
-    "CutoffResult",
-    "BatchAUCResult",
+    "ROCParams",
+    "ROCSolution",
+    "DiagnosticParams",
+    "DiagnosticSolution",
+    "ROCTestParams",
+    "ROCTestSolution",
+    "CutoffParams",
+    "CutoffSolution",
+    "BatchAUCParams",
+    "BatchAUCSolution",
     "roc",
     "roc_test",
     "diagnostic_accuracy",

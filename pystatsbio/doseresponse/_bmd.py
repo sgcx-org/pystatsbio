@@ -15,15 +15,16 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import NumericalError, ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 from scipy.optimize import brentq
 from scipy.stats import norm
 
-from pystatsbio.doseresponse._common import CurveParams, DoseResponseResult
+from pystatsbio.doseresponse._common import CurveParams, DoseResponseSolution
 
 
 @dataclass(frozen=True)
-class BMDResult:
-    """Benchmark dose result."""
+class BMDParams:
+    """Computed payload of benchmark dose analysis."""
 
     bmd: float  # benchmark dose (point estimate)
     bmdl: float  # lower confidence limit
@@ -31,6 +32,67 @@ class BMDResult:
     bmr: float  # benchmark response level
     conf_level: float
     method: str  # 'delta'
+
+
+class BMDSolution(SolutionReprMixin):
+    """Public result of benchmark dose analysis — wraps ``Result[BMDParams]``.
+
+    Exposes every output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[BMDParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- BMD outputs (from the payload) ---
+    @property
+    def bmd(self) -> float:
+        return self._result.params.bmd
+
+    @property
+    def bmdl(self) -> float:
+        return self._result.params.bmdl
+
+    @property
+    def bmdu(self) -> float:
+        return self._result.params.bmdu
+
+    @property
+    def bmr(self) -> float:
+        return self._result.params.bmr
+
+    @property
+    def conf_level(self) -> float:
+        return self._result.params.conf_level
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"BMDSolution(bmd={p.bmd:.4g}, "
+            f"bmdl={p.bmdl:.4g}, bmdu={p.bmdu:.4g}, bmr={p.bmr})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +162,7 @@ def _bmd_from_params_array(
 
 
 def _bmd_delta_ci(
-    fit_result: DoseResponseResult,
+    fit_result: DoseResponseSolution,
     bmd_val: float,
     target: float,
     conf_level: float,
@@ -168,18 +230,18 @@ def _bmd_delta_ci(
 # ---------------------------------------------------------------------------
 
 def bmd(
-    fit_result: DoseResponseResult,
+    fit_result: DoseResponseSolution,
     *,
     bmr: float = 0.10,
     bmr_type: str = "extra",
     conf_level: float = 0.95,
     method: str = "delta",
-) -> BMDResult:
+) -> BMDSolution:
     """Compute benchmark dose (BMD) with BMDL/BMDU.
 
     Parameters
     ----------
-    fit_result : DoseResponseResult
+    fit_result : DoseResponseSolution
         A fitted dose-response model.
     bmr : float
         Benchmark response level (default 10 % = 0.10).
@@ -192,7 +254,7 @@ def bmd(
 
     Returns
     -------
-    BMDResult
+    BMDSolution
 
     Raises
     ------
@@ -247,7 +309,7 @@ def bmd(
     # Confidence limits
     bmdl, bmdu = _bmd_delta_ci(fit_result, bmd_val, target, conf_level)
 
-    return BMDResult(
+    params = BMDParams(
         bmd=bmd_val,
         bmdl=bmdl,
         bmdu=bmdu,
@@ -255,3 +317,10 @@ def bmd(
         conf_level=conf_level,
         method=method,
     )
+    result = Result(
+        params=params,
+        info={"bmr": bmr, "bmr_type": bmr_type, "conf_level": conf_level, "method": method},
+        timing=None,
+        backend_name="cpu",
+    )
+    return BMDSolution(result)

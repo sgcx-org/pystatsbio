@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pystatsbio.diagnostic import DiagnosticResult, diagnostic_accuracy
+from pystatsbio.diagnostic import DiagnosticSolution, diagnostic_accuracy
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ class TestDiagnosticAccuracy:
 
     def test_returns_result(self, biomarker_data):
         r = diagnostic_accuracy(*biomarker_data, cutoff=4.5)
-        assert isinstance(r, DiagnosticResult)
+        assert isinstance(r, DiagnosticSolution)
 
     def test_sensitivity_range(self, biomarker_data):
         r = diagnostic_accuracy(*biomarker_data, cutoff=4.5)

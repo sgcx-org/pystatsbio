@@ -240,7 +240,6 @@ def _fit_gee(
 
     # Group by cluster
     y_groups, X_groups, idx_groups = _group_by_cluster(y, X, cluster_ids)
-    n_clusters = len(y_groups)
 
     # Initialize beta
     beta = _initialize_beta(y, X, family)

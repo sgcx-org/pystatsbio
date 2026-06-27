@@ -7,12 +7,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 from scipy.optimize import brentq
 
 
 @dataclass(frozen=True)
-class PowerResult:
-    """Result of a power/sample size calculation.
+class PowerParams:
+    """Computed payload of a power/sample size calculation.
 
     Exactly one of n, power, or effect_size will have been solved for
     (the parameter passed as None). The others are the user-supplied inputs.
@@ -26,21 +27,121 @@ class PowerResult:
     method: str
     note: str = ""
 
+
+class PowerSolution(SolutionReprMixin):
+    """Public result of a power/sample size calculation.
+
+    A Solution wrapping ``Result[PowerParams]`` — exposes every computed value
+    as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[PowerParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- Computed values (from the payload) ---
+    @property
+    def n(self) -> int | None:
+        return self._result.params.n
+
+    @property
+    def power(self) -> float | None:
+        return self._result.params.power
+
+    @property
+    def effect_size(self) -> float | None:
+        return self._result.params.effect_size
+
+    @property
+    def alpha(self) -> float:
+        return self._result.params.alpha
+
+    @property
+    def alternative(self) -> str:
+        return self._result.params.alternative
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
+    @property
+    def note(self) -> str:
+        return self._result.params.note
+
     def summary(self) -> str:
         """Human-readable summary, similar to R's print.power.htest."""
-        lines = [self.method, ""]
-        if self.n is not None:
-            lines.append(f"              n = {self.n}")
-        if self.effect_size is not None:
-            lines.append(f"    effect size = {self.effect_size:.6f}")
-        lines.append(f"          alpha = {self.alpha}")
-        if self.power is not None:
-            lines.append(f"          power = {self.power:.6f}")
-        lines.append(f"    alternative = {self.alternative}")
-        if self.note:
+        p = self._result.params
+        lines = [p.method, ""]
+        if p.n is not None:
+            lines.append(f"              n = {p.n}")
+        if p.effect_size is not None:
+            lines.append(f"    effect size = {p.effect_size:.6f}")
+        lines.append(f"          alpha = {p.alpha}")
+        if p.power is not None:
+            lines.append(f"          power = {p.power:.6f}")
+        lines.append(f"    alternative = {p.alternative}")
+        if p.note:
             lines.append("")
-            lines.append(f"NOTE: {self.note}")
+            lines.append(f"NOTE: {p.note}")
         return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"PowerSolution(method={p.method!r}, n={p.n}, "
+            f"power={p.power}, effect_size={p.effect_size})"
+        )
+
+
+def _solution(
+    *,
+    n: int | None,
+    power: float | None,
+    effect_size: float | None,
+    alpha: float,
+    alternative: str,
+    method: str,
+    note: str = "",
+) -> PowerSolution:
+    """Build a :class:`PowerSolution` from the computed power-analysis values.
+
+    Wraps the payload in a ``Result`` envelope (CPU backend, ``method`` recorded
+    in ``info``) so every power function returns the uniform Solution shape.
+    """
+    params = PowerParams(
+        n=n,
+        power=power,
+        effect_size=effect_size,
+        alpha=alpha,
+        alternative=alternative,
+        method=method,
+        note=note,
+    )
+    result = Result(
+        params=params,
+        info={"method": method},
+        timing=None,
+        backend_name="cpu",
+    )
+    return PowerSolution(result)
 
 
 # ---------------------------------------------------------------------------

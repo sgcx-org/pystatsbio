@@ -17,18 +17,65 @@ import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.compute.backend import resolve_backend
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 
 if TYPE_CHECKING:
     import torch
 
 
 @dataclass(frozen=True)
-class BatchAUCResult:
-    """Result of batch AUC computation across multiple biomarkers."""
+class BatchAUCParams:
+    """Computed payload of batch AUC computation across multiple biomarkers."""
 
     auc: NDArray[np.floating]  # shape (n_markers,)
     se: NDArray[np.floating]  # DeLong SE for each
     n_markers: int
+
+
+class BatchAUCSolution(SolutionReprMixin):
+    """Public result of batch AUC — wraps ``Result[BatchAUCParams]``.
+
+    Exposes every output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[BatchAUCParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- Batch AUC outputs (from the payload) ---
+    @property
+    def auc(self) -> NDArray[np.floating]:
+        return self._result.params.auc
+
+    @property
+    def se(self) -> NDArray[np.floating]:
+        return self._result.params.se
+
+    @property
+    def n_markers(self) -> int:
+        return self._result.params.n_markers
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return f"BatchAUCSolution(n_markers={p.n_markers})"
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +84,7 @@ class BatchAUCResult:
 
 def _batch_auc_cpu(
     response: NDArray, predictors: NDArray,
-) -> BatchAUCResult:
+) -> BatchAUCSolution:
     """Column-wise AUC + DeLong SE on CPU."""
     from scipy import stats as sp_stats
 
@@ -73,7 +120,14 @@ def _batch_auc_cpu(
         auc_arr[m] = auc_m
         se_arr[m] = np.sqrt(var_auc)
 
-    return BatchAUCResult(auc=auc_arr, se=se_arr, n_markers=M)
+    params = BatchAUCParams(auc=auc_arr, se=se_arr, n_markers=M)
+    result = Result(
+        params=params,
+        info={"n_markers": M},
+        timing=None,
+        backend_name="cpu",
+    )
+    return BatchAUCSolution(result)
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +136,7 @@ def _batch_auc_cpu(
 
 def _batch_auc_gpu(
     response: NDArray, predictors: NDArray, *, use_fp64: bool,
-) -> BatchAUCResult:
+) -> BatchAUCSolution:
     """Batched AUC + DeLong SE on a CUDA GPU via PyTorch.
 
     Fully vectorized: no Python loops over markers or samples.
@@ -130,11 +184,18 @@ def _batch_auc_gpu(
 
     se_t = torch.sqrt(S10 / n1 + S01 / n0)
 
-    return BatchAUCResult(
+    params = BatchAUCParams(
         auc=auc_t.cpu().numpy().astype(np.float64),
         se=se_t.cpu().numpy().astype(np.float64),
         n_markers=M,
     )
+    result = Result(
+        params=params,
+        info={"n_markers": M},
+        timing=None,
+        backend_name=f"batch_auc_gpu ({device.type})",
+    )
+    return BatchAUCSolution(result)
 
 
 def _midranks_vectorized(
@@ -219,7 +280,7 @@ def batch_auc(
     predictors: NDArray[np.floating],
     *,
     backend: str = "auto",
-) -> BatchAUCResult:
+) -> BatchAUCSolution:
     """Compute AUC for many biomarker candidates simultaneously.
 
     Parameters
@@ -238,7 +299,7 @@ def batch_auc(
 
     Returns
     -------
-    BatchAUCResult
+    BatchAUCSolution
 
     Notes
     -----

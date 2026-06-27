@@ -15,7 +15,7 @@ Validates against: R metafor::rma()
 from numpy.typing import ArrayLike
 from pystatistics.core.exceptions import ValidationError
 
-from pystatsbio.meta._common import MetaResult, validate_inputs
+from pystatsbio.meta._common import MetaParams, MetaSolution, validate_inputs
 from pystatsbio.meta._fixed import _fit_fixed
 from pystatsbio.meta._heterogeneity import cochran_q, h_squared, i_squared
 from pystatsbio.meta._random import _fit_dl, _fit_pm, _fit_reml
@@ -29,7 +29,7 @@ def rma(
     *,
     method: str = "REML",
     conf_level: float = 0.95,
-) -> MetaResult:
+) -> MetaSolution:
     """Random-effects (or fixed-effects) meta-analysis.
 
     Matches R's metafor::rma(yi, vi, method=...) for the common case
@@ -52,9 +52,10 @@ def rma(
 
     Returns
     -------
-    MetaResult
-        Frozen dataclass with pooled estimate, heterogeneity statistics,
-        and study weights.
+    MetaSolution
+        Solution wrapping the pooled estimate, heterogeneity statistics,
+        and study weights, with a summary method and the uniform
+        .backend_name/.timing/.warnings/.info accessors.
 
     Raises
     ------
@@ -92,7 +93,8 @@ def rma(
 
 
 __all__ = [
-    "MetaResult",
+    "MetaSolution",
+    "MetaParams",
     "rma",
     "cochran_q",
     "i_squared",

@@ -12,9 +12,10 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result
 from scipy import stats
 
-from pystatsbio.epi._common import Epi2x2Result, EpiMeasure
+from pystatsbio.epi._common import Epi2x2Params, Epi2x2Solution, EpiMeasure
 
 
 def _validate_2by2(table: NDArray) -> NDArray:
@@ -226,7 +227,7 @@ def epi_2by2(
     table: ArrayLike,
     *,
     conf_level: float = 0.95,
-) -> Epi2x2Result:
+) -> Epi2x2Solution:
     """Compute epidemiological measures from a 2x2 contingency table.
 
     Table layout (matching R's epiR::epi.2by2):
@@ -251,7 +252,7 @@ def epi_2by2(
 
     Returns
     -------
-    Epi2x2Result
+    Epi2x2Solution
 
     Raises
     ------
@@ -291,7 +292,7 @@ def epi_2by2(
         conf_level,
     )
 
-    return Epi2x2Result(
+    params = Epi2x2Params(
         risk_ratio=rr_result,
         odds_ratio=or_result,
         risk_difference=rd_result,
@@ -300,3 +301,10 @@ def epi_2by2(
         nnt=nnt_result,
         table=tbl,
     )
+    result = Result(
+        params=params,
+        info={"conf_level": conf_level},
+        timing=None,
+        backend_name="cpu",
+    )
+    return Epi2x2Solution(result)

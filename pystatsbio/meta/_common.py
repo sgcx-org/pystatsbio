@@ -1,4 +1,11 @@
-"""Shared result types for meta-analysis."""
+"""Result types for meta-analysis.
+
+``MetaParams`` is the frozen payload of computed outputs; ``MetaSolution`` is
+the public return — it wraps a ``core.result.Result[MetaParams]`` so every
+meta-analysis exposes the same ``.backend_name`` / ``.timing`` / ``.warnings`` /
+``.info`` metadata and Jupyter ``_repr_html_`` as the rest of the ecosystem
+(``pystatsbio/CONVENTIONS.md`` B2).
+"""
 
 from __future__ import annotations
 
@@ -7,11 +14,12 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from pystatistics.core.exceptions import ValidationError
+from pystatistics.core.result import Result, SolutionReprMixin
 
 
 @dataclass(frozen=True)
-class MetaResult:
-    """Result from a meta-analysis.
+class MetaParams:
+    """Computed payload of a meta-analysis.
 
     Attributes
     ----------
@@ -78,6 +86,116 @@ class MetaResult:
     yi: NDArray
     vi: NDArray
 
+
+class MetaSolution(SolutionReprMixin):
+    """Public result of a meta-analysis — a Solution wrapping ``Result[MetaParams]``.
+
+    Exposes every fit output as a read-only property plus the uniform
+    ``.backend_name`` / ``.timing`` / ``.warnings`` / ``.info`` metadata and a
+    Jupyter ``_repr_html_`` (via :class:`SolutionReprMixin`).
+    """
+
+    def __init__(self, result: Result[MetaParams]) -> None:
+        self._result = result
+
+    # --- Metadata (from the Result envelope) ---
+    @property
+    def backend_name(self) -> str:
+        return self._result.backend_name
+
+    @property
+    def timing(self) -> dict[str, float] | None:
+        return self._result.timing
+
+    @property
+    def warnings(self) -> tuple[str, ...]:
+        return self._result.warnings
+
+    @property
+    def info(self) -> dict:
+        return self._result.info
+
+    # --- Fit outputs (from the payload) ---
+    @property
+    def estimate(self) -> float:
+        return self._result.params.estimate
+
+    @property
+    def se(self) -> float:
+        return self._result.params.se
+
+    @property
+    def ci_lower(self) -> float:
+        return self._result.params.ci_lower
+
+    @property
+    def ci_upper(self) -> float:
+        return self._result.params.ci_upper
+
+    @property
+    def z_value(self) -> float:
+        return self._result.params.z_value
+
+    @property
+    def p_value(self) -> float:
+        return self._result.params.p_value
+
+    @property
+    def tau2(self) -> float:
+        return self._result.params.tau2
+
+    @property
+    def tau2_se(self) -> float | None:
+        return self._result.params.tau2_se
+
+    @property
+    def tau(self) -> float:
+        return self._result.params.tau
+
+    @property
+    def I2(self) -> float:
+        return self._result.params.I2
+
+    @property
+    def H2(self) -> float:
+        return self._result.params.H2
+
+    @property
+    def Q(self) -> float:
+        return self._result.params.Q
+
+    @property
+    def Q_df(self) -> int:
+        return self._result.params.Q_df
+
+    @property
+    def Q_p(self) -> float:
+        return self._result.params.Q_p
+
+    @property
+    def k(self) -> int:
+        return self._result.params.k
+
+    @property
+    def method(self) -> str:
+        return self._result.params.method
+
+    @property
+    def conf_level(self) -> float:
+        return self._result.params.conf_level
+
+    @property
+    def weights(self) -> NDArray:
+        return self._result.params.weights
+
+    @property
+    def yi(self) -> NDArray:
+        return self._result.params.yi
+
+    @property
+    def vi(self) -> NDArray:
+        return self._result.params.vi
+
     def summary(self) -> str:
         """R-style summary matching metafor::rma() output.
 
@@ -86,48 +204,56 @@ class MetaResult:
         str
             Multi-line human-readable summary of the meta-analysis.
         """
+        p = self._result.params
         method_labels = {
             "FE": "Fixed-Effects Model",
             "DL": "Random-Effects Model (DerSimonian-Laird)",
             "REML": "Random-Effects Model (REML)",
             "PM": "Random-Effects Model (Paule-Mandel)",
         }
-        label = method_labels.get(self.method, self.method)
+        label = method_labels.get(p.method, p.method)
         lines = [
             label,
             "=" * 60,
             "",
-            f"Number of studies: k = {self.k}",
+            f"Number of studies: k = {p.k}",
             "",
         ]
-        if self.method != "FE":
+        if p.method != "FE":
             lines.append(
                 f"tau2 (estimated amount of total heterogeneity): "
-                f"{self.tau2:.4f}"
-                + (f" (SE = {self.tau2_se:.4f})" if self.tau2_se is not None else "")
+                f"{p.tau2:.4f}"
+                + (f" (SE = {p.tau2_se:.4f})" if p.tau2_se is not None else "")
             )
-            lines.append(f"tau  (sqrt of tau2):                            {self.tau:.4f}")
-            lines.append(f"I2   (total heterogeneity / total variability): {self.I2:.2f}%")
-            lines.append(f"H2   (total variability / sampling variability): {self.H2:.2f}")
+            lines.append(f"tau  (sqrt of tau2):                            {p.tau:.4f}")
+            lines.append(f"I2   (total heterogeneity / total variability): {p.I2:.2f}%")
+            lines.append(f"H2   (total variability / sampling variability): {p.H2:.2f}")
             lines.append("")
 
         lines.append("Test for Heterogeneity:")
         lines.append(
-            f"Q(df = {self.Q_df}) = {self.Q:.4f}, p-val "
-            + (f"< .0001" if self.Q_p < 0.0001 else f"= {self.Q_p:.4f}")
+            f"Q(df = {p.Q_df}) = {p.Q:.4f}, p-val "
+            + ("< .0001" if p.Q_p < 0.0001 else f"= {p.Q_p:.4f}")
         )
         lines.append("")
         lines.append("Model Results:")
         lines.append(
-            f"estimate = {self.estimate:.4f}, se = {self.se:.4f}, "
-            f"z = {self.z_value:.4f}, "
-            f"p " + (f"< .0001" if self.p_value < 0.0001 else f"= {self.p_value:.4f}")
+            f"estimate = {p.estimate:.4f}, se = {p.se:.4f}, "
+            f"z = {p.z_value:.4f}, "
+            f"p " + ("< .0001" if p.p_value < 0.0001 else f"= {p.p_value:.4f}")
         )
-        ci_pct = f"{self.conf_level:.0%}"
+        ci_pct = f"{p.conf_level:.0%}"
         lines.append(
-            f"{ci_pct} CI: [{self.ci_lower:.4f}, {self.ci_upper:.4f}]"
+            f"{ci_pct} CI: [{p.ci_lower:.4f}, {p.ci_upper:.4f}]"
         )
         return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        p = self._result.params
+        return (
+            f"MetaSolution(method={p.method!r}, k={p.k}, "
+            f"estimate={p.estimate:.4f}, tau2={p.tau2:.4f})"
+        )
 
 
 def validate_inputs(

@@ -10,7 +10,7 @@ import math
 from pystatistics.core.exceptions import ValidationError
 from scipy.stats import norm
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 
 _VALID_METHODS = ("schoenfeld", "freedman", "lachin_foulkes")
 _VALID_ALTERNATIVES = ("two-sided", "one-sided")
@@ -130,7 +130,7 @@ def power_logrank(
     p_event: float = 1.0,
     alloc_ratio: float = 1.0,
     method: str = "schoenfeld",
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for the log-rank test.
 
     Exactly one of ``n``, ``hazard_ratio``, ``power`` must be ``None``.
@@ -156,7 +156,7 @@ def power_logrank(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -232,7 +232,7 @@ def power_logrank(
         "lachin_foulkes": "Lachin-Foulkes",
     }
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_hr,

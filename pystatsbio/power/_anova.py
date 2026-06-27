@@ -11,7 +11,7 @@ from pystatistics.core.exceptions import ValidationError
 from scipy.stats import f as f_dist
 from scipy.stats import ncf
 
-from pystatsbio.power._common import PowerResult, _check_power_args, _solve_parameter
+from pystatsbio.power._common import PowerSolution, _check_power_args, _solution, _solve_parameter
 
 # ---------------------------------------------------------------------------
 # Internal power computation
@@ -101,7 +101,7 @@ def power_anova_oneway(
     n_groups: int = 2,
     alpha: float = 0.05,
     power: float | None = None,
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for one-way ANOVA (balanced design).
 
     Exactly one of ``n``, ``effect_size``, ``power`` must be ``None``.
@@ -121,7 +121,7 @@ def power_anova_oneway(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -167,7 +167,7 @@ def power_anova_oneway(
         result_n = n
         result_power = power
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_f,
@@ -185,7 +185,7 @@ def power_anova_factorial(
     alpha: float = 0.05,
     power: float | None = None,
     effect: str = "interaction",
-) -> PowerResult:
+) -> PowerSolution:
     """Power calculation for factorial ANOVA.
 
     Exactly one of ``n``, ``effect_size``, ``power`` must be ``None``.
@@ -207,7 +207,7 @@ def power_anova_factorial(
 
     Returns
     -------
-    PowerResult
+    PowerSolution
 
     Examples
     --------
@@ -275,7 +275,7 @@ def power_anova_factorial(
 
     design_str = "x".join(str(lev) for lev in n_levels)
 
-    return PowerResult(
+    return _solution(
         n=result_n,
         power=result_power,
         effect_size=result_f,

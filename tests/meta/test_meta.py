@@ -8,7 +8,7 @@ Effect sizes are log risk ratios with corresponding sampling variances.
 import numpy as np
 import pytest
 
-from pystatsbio.meta import MetaResult, cochran_q, h_squared, i_squared, rma
+from pystatsbio.meta import MetaSolution, cochran_q, h_squared, i_squared, rma
 
 # ---------------------------------------------------------------------------
 # BCG vaccine dataset (13 studies)
@@ -37,7 +37,7 @@ class TestFixedEffects:
 
     def test_returns_meta_result(self):
         result = rma(BCG_YI, BCG_VI, method="FE")
-        assert isinstance(result, MetaResult)
+        assert isinstance(result, MetaSolution)
 
     def test_method_label(self):
         result = rma(BCG_YI, BCG_VI, method="FE")
@@ -152,7 +152,7 @@ class TestREML:
 
     def test_converges(self):
         result = rma(BCG_YI, BCG_VI, method="REML")
-        assert isinstance(result, MetaResult)
+        assert isinstance(result, MetaSolution)
 
     def test_tau2_known_value(self):
         """REML tau2 for BCG data (restricted maximum likelihood)."""
@@ -201,7 +201,7 @@ class TestPauleMandel:
 
     def test_converges(self):
         result = rma(BCG_YI, BCG_VI, method="PM")
-        assert isinstance(result, MetaResult)
+        assert isinstance(result, MetaSolution)
 
     def test_tau2_positive(self):
         result = rma(BCG_YI, BCG_VI, method="PM")
@@ -394,7 +394,7 @@ class TestEdgeCases:
         assert (r99.ci_upper - r99.ci_lower) > (r95.ci_upper - r95.ci_lower)
 
     def test_frozen_dataclass(self):
-        """MetaResult should be immutable."""
+        """MetaSolution attributes should be read-only (assigning raises AttributeError)."""
         result = rma(BCG_YI, BCG_VI, method="FE")
         with pytest.raises(AttributeError):
             result.estimate = 999.0
@@ -421,7 +421,7 @@ class TestEdgeCases:
         yi_list = BCG_YI.tolist()
         vi_list = BCG_VI.tolist()
         result = rma(yi_list, vi_list, method="DL")
-        assert isinstance(result, MetaResult)
+        assert isinstance(result, MetaSolution)
 
     def test_large_heterogeneity(self):
         """Very heterogeneous data should have large tau2."""
