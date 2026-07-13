@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pystatsbio"
-version = "2.0.0"
+version = "3.0.0"
 description = "Biotech and pharmaceutical statistical computing for Python"
 readme = "README.md"
 license = "MIT"
@@ -36,9 +36,12 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # 4.0 folds GPU precision into the backend string (gpu_fp64) and ships
-    # core.compute.backend (canonical backend messages) that gee() now uses.
-    "pystatistics>=4.0",
+    # Requires pystatistics 5.0: pystatsbio 3.0 tracks the settled post-5.0
+    # surface (5.0's exception taxonomy, de-dotted values, and the
+    # Result[*Params] / *Solution result objects). The GPU-precision-in-the-
+    # backend-string convention (gpu_fp64) and core.compute.backend messages
+    # that gee() uses were carried forward from 4.0.
+    "pystatistics>=5.0",
     "numpy>=1.24",
     "scipy>=1.10",
 ]

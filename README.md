@@ -22,6 +22,22 @@ Each function states exactly which R function it replicates and to what toleranc
 
 ---
 
+## What's New in 3.0
+
+Version 3.0 tracks the PyStatistics 5.0 API. **It requires `pystatistics>=5.0`**
+and will not run on 4.x. PyStatsBio's own statistical results are unchanged; the
+breaking change is the raised dependency floor plus one relayed value:
+
+- **GLM/GEE family names are lowercase.** Following PyStatistics 5.0's naming
+  cleanup, the Gamma family now reports `result.family_name == "gamma"` (was
+  `"Gamma"`), consistent with `"gaussian"`, `"binomial"`, and `"poisson"`. Code
+  that compared against the capitalized `"Gamma"` must switch to `"gamma"`.
+
+Everything introduced in 2.0 — the `…Solution` result objects, the descriptive
+power-analysis parameters, the hyphenated option values, and the
+`ValidationError` / `ConvergenceError` / `NumericalError` taxonomy — is
+unchanged.
+
 ## What's New in 2.0
 
 Version 2.0 is a consistency release that aligns the whole library with the
@@ -260,7 +276,7 @@ print(result.summary())
 | `bmd()` | `drc::bmd()` / `BMDS` |
 
 Models: `LL.4` (4PL), `LL.5` (5PL), `W1.4` (Weibull-1), `W2.4` (Weibull-2),
-`BC.4` (Brain-Cousens hormesis).
+`BC.5` (Brain-Cousens hormesis).
 
 ### `diagnostic` — Diagnostic Accuracy
 

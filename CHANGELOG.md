@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.0.0
+
+### Summary
+
+3.0 tracks the PyStatistics 5.0 API. PyStatsBio's statistical results are
+unchanged; this is a breaking release because the required PyStatistics floor
+moves to 5.0 (the 4.x API it was built against is gone) and one relayed value
+changes.
+
+### Changed
+
+- **Requires `pystatistics>=5.0`** (was `>=4.0`). PyStatistics 5.0 hard-renamed
+  ~40 public names and removed the 4.x surface with no shim, so PyStatsBio
+  cannot run on 4.x. PyStatsBio's own source needed no code changes: its only
+  coupling to PyStatistics is through internal infrastructure
+  (`core.exceptions`, `core.result`, `core.compute.{backend,device,tolerances}`,
+  `regression.families`), all of which 5.0 left stable. Verified by running the
+  full test suite against `pystatistics==5.0.0` from PyPI. (`pyproject.toml`)
+- **GLM/GEE family names are lowercase.** `gee(..., family="gamma").family_name`
+  now returns `"gamma"` instead of `"Gamma"`, matching the sibling families
+  (`"gaussian"`, `"binomial"`, `"poisson"`). The value is relayed straight from
+  PyStatistics' `Family.name`, which 5.0 changed for naming consistency
+  (`GammaFamily`→`Gamma`, `.name` `'Gamma'`→`'gamma'`); PyStatsBio's GEE code
+  (`gee/__init__.py`) was already correct and needed no change. Updated the one
+  stale test assertion in `tests/gee/test_gee.py`
+  (`TestBasicFitting::test_gamma_family`).
+
+### Fixed
+
+- **README dose-response model identifier corrected**: the `doseresponse`
+  models list advertised `BC.4` for the Brain-Cousens hormesis model, but
+  `fit_drm`/`fit_drm_batch` only accept `BC.5` (the shipped model is the
+  5-parameter Brain-Cousens). Following the README verbatim raised a
+  `ValidationError`. The README now lists `BC.5`; the code is unchanged.
+- `docs/conf.py` `version`/`release` were stuck at `0.1.0` (never tracked the
+  package version); set to `3.0.0`.
+- `pystatsbio/CONVENTIONS.md` §0 now cites the pystatistics **5.0** constitution
+  and its amendments **A1–A14** (was "4.0" / "A1–A5").
+
+
 ## 2.0.0 — the consistency release
 
 A library-wide pass that aligns PyStatsBio with the PyStatistics 4.0 API

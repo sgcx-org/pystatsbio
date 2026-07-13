@@ -8,7 +8,7 @@ dose-response).
 
 ## 0. Adoption
 
-The binding base is **`pystatistics/CONVENTIONS.md`** (the pystatistics 4.0
+The binding base is **`pystatistics/CONVENTIONS.md`** (the pystatistics 5.0
 constitution). Everything in it applies to pystatsbio verbatim:
 
 - the **naming law** S0–S6 (one name one meaning; descriptive `snake_case`; no
@@ -24,7 +24,7 @@ constitution). Everything in it applies to pystatsbio verbatim:
 - the **result-object conventions** (`…Solution` wrapping `Result[…Params]`;
   uniform accessors; `summary()` + `__repr__` + `_repr_html_` via
   `core.result.SolutionReprMixin`);
-- the **exception conventions** and amendments **A1–A5**.
+- the **exception conventions** and amendments **A1–A14**.
 
 When this document and the base disagree, **this document wins for pystatsbio**;
 where this document is silent, the base governs. Like the base, this document is
