@@ -213,8 +213,8 @@ NCA is required for every PK study. Self-contained, well-defined, formulaic calc
 - **Half-life**: terminal elimination rate constant via log-linear regression
 - **Clearance**: CL = Dose / AUC
 - **Volume of distribution**: Vz = Dose / (lambda_z * AUC)
-- **PK summary statistics**: geometric means and CVs (standard for PK data), confidence intervals on log-scale parameters
-- **Bioequivalence PK**: Cmax and AUC ratio analysis
+- **AUMC / MRT**: area under the first moment curve (last + extrapolated) and mean
+  residence time (`.aumc_last`, `.aumc_inf`, `.mrt`)
 
 **R packages to match:** `PKNCA`, `NonCompart`
 
@@ -226,6 +226,9 @@ from pystatsbio import pk
 # NCA (CPU - always small data)
 result = pk.nca(time, concentration, dose=100, route='ev')
 print(result.auc_inf, result.cmax, result.half_life, result.clearance)
+print(result.aumc_inf, result.mrt)   # first-moment area and mean residence time
+# If the terminal phase can't be fitted, lambda_z (and everything derived from it)
+# is None and result.warnings says why.
 ```
 
 ---

@@ -61,6 +61,25 @@ def test_ec50_ll4_equals_raw_e():
     assert ec.estimate == pytest.approx(fit.params.ec50, rel=1e-6)
 
 
+# drc summary(drm(...))["b:(Intercept)","Std. Error"] — the Hill-slope SE, where
+# the old Gauss-Newton covariance diverged from drc most (up to ~11%).
+_DRC_HILL_SE = {"LL.4": 0.465062, "W1.4": 0.478317, "W2.4": 0.290700, "BC.5": 0.524610}
+
+
+@pytest.mark.parametrize("model", list(_DRC_HILL_SE))
+def test_coefficient_se_matches_drc_observed_information(model):
+    """Coefficient SEs use the observed-information covariance (matching drc's
+    summary() to <1%), not the Gauss-Newton approximation that was up to ~11% off
+    on the Hill slope."""
+    fit = dr.fit_drm(_CONC, _ROOTL, model=model)
+    # SEs are only comparable when the fit reached drc's optimum.
+    rss = float(np.sum((_ROOTL - fit.params.predict(_CONC)) ** 2))
+    assert rss == pytest.approx(_DRC[model]["rss"], rel=1e-4)
+    names = ["bottom", "top", "ec50", "hill"] + (["hormesis"] if model == "BC.5" else [])
+    hill_se = float(fit.se[names.index("hill")])
+    assert hill_se == pytest.approx(_DRC_HILL_SE[model], rel=5e-3)
+
+
 @pytest.mark.parametrize("model", list(_DRC))
 def test_fit_reaches_drc_rss(model):
     """Every model reaches drc's optimum RSS (W2.4 no longer stuck in the mirror basin)."""
@@ -75,3 +94,38 @@ def test_w24_not_stuck_in_mirror_basin():
     rss = float(np.sum((_ROOTL - fit.params.predict(_CONC)) ** 2))
     assert rss < 5.6  # the stuck basin was 6.024
     assert fit.params.bottom < fit.params.top  # natural asymptote labelling
+
+
+# --- relative_potency: must ratio the SOLVED ED50s, not the raw `e` params -------
+
+def _ll5(d, bottom, top, e, hill, asym):
+    x = np.maximum(np.asarray(d, float), 1e-9)
+    return bottom + (top - bottom) / (1 + np.exp(hill * (np.log(x) - np.log(e)))) ** asym
+
+
+@pytest.mark.parametrize("model", ["LL.4", "LL.5"])
+def test_relative_potency_parallel_curves_recovers_dose_scaling(model):
+    """For parallel curves a pure 3x dose shift must give ratio 3 (unchanged behaviour)."""
+    f1 = dr.fit_drm(_CONC, _ROOTL, model=model)
+    f2 = dr.fit_drm(_CONC * 3.0, _ROOTL, model=model)
+    assert dr.relative_potency(f1, f2).ratio == pytest.approx(3.0, rel=1e-4)
+
+
+def test_relative_potency_uses_solved_ed50_not_raw_e():
+    """Regression: on NON-parallel asymmetric curves the potency ratio must be the
+    ratio of the solved ED50s. Ratioing the raw `e` parameters (the 4.0.1 bug) gave
+    a wildly different number — and even the wrong direction."""
+    rng = np.random.RandomState(3)
+    d = np.array([0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100.0] * 3)
+    # different asymmetry -> non-parallel -> the e->ED50 factor does NOT cancel
+    y1 = _ll5(d, 0.2, 8.0, 2.0, 1.5, 0.5) + rng.randn(len(d)) * 0.05
+    y2 = _ll5(d, 0.2, 8.0, 4.0, 1.5, 3.0) + rng.randn(len(d)) * 0.05
+    f1 = dr.fit_drm(d, y1, model="LL.5")
+    f2 = dr.fit_drm(d, y2, model="LL.5")
+
+    rp = dr.relative_potency(f1, f2)
+    ed50_ratio = dr.ec50(f2).estimate / dr.ec50(f1).estimate
+    raw_e_ratio = f2.params.ec50 / f1.params.ec50
+
+    assert rp.ratio == pytest.approx(ed50_ratio, rel=1e-6)   # the correct quantity
+    assert abs(rp.ratio - raw_e_ratio) / rp.ratio > 0.5      # and NOT the raw-e ratio

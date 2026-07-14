@@ -3,7 +3,8 @@
 Implements the standard NCA calculations used in every PK study:
 AUC (linear, log-linear, linear-up/log-down trapezoidal), Cmax/Tmax,
 terminal elimination rate constant (lambda_z) via log-linear regression,
-half-life, clearance, volume of distribution, AUMC, and MRT.
+half-life, clearance, volume of distribution, AUMC (area under the first moment
+curve), and MRT (mean residence time).
 
 The linear-up/log-down method is the FDA-recommended default: linear
 trapezoidal on ascending segments, log-linear trapezoidal on descending
@@ -18,12 +19,11 @@ Gibaldi & Perrier (1982). *Pharmacokinetics*, 2nd ed.
 
 FDA Guidance: Bioanalytical Method Validation (2018).
 
-Validates against: R ``PKNCA::pk.nca()``, ``NonCompart::sNCA()``.
+Validates against: R ``NonCompart::sNCA()``. (PKNCA uses a different default
+terminal-slope selection and is not a validated reference for this module.)
 """
 
 from __future__ import annotations
-
-import contextlib
 
 import numpy as np
 from numpy.typing import NDArray
@@ -414,7 +414,16 @@ def nca(
     CPU-only.  PK data is always small (typically 10-20 time points per
     subject).
 
-    Validates against: R ``PKNCA::pk.nca()``, ``NonCompart::sNCA()``.
+    Validates against: R ``NonCompart::sNCA()``. (PKNCA uses a different default
+    terminal-slope selection and is not a validated reference for this module.)
+
+    Notes
+    -----
+    If the terminal phase cannot be fitted (too few positive post-Cmax points, or
+    no true elimination phase), ``lambda_z`` — and everything derived from it
+    (``half_life``, ``auc_inf``, ``auc_pct_extrap``, ``clearance``, ``vz``) —
+    is ``None``, and the reason is reported in ``.warnings``. Callers must check
+    for ``None``.
     """
     time, concentration = _validate_inputs(time, concentration, route, auc_method)
     n_points = len(time)
@@ -437,6 +446,9 @@ def nca(
             lambda_z_r_squared=None,
             clearance=None,
             vz=None,
+            aumc_last=0.0,
+            aumc_inf=None,
+            mrt=None,
             dose=dose,
             route=route,
             auc_method=auc_method,
@@ -455,6 +467,10 @@ def nca(
             },
             timing=None,
             backend_name="cpu",
+            warnings=(
+                "all concentrations are zero: AUC is 0 and lambda_z, half_life, "
+                "auc_inf, clearance and vz are None.",
+            ),
         )
         return NCASolution(result)
 
@@ -465,29 +481,53 @@ def nca(
     auc_last = float(np.sum(auc_segments))
 
     # ----- Terminal elimination -----
+    # A profile with no fittable terminal phase is a legitimate outcome, not a
+    # programming error — but it must NOT pass silently: lambda_z and every
+    # parameter derived from it come back None, and the reason is surfaced in
+    # .warnings so the caller is told why (fail loud, don't fail quiet).
     lambda_z: float | None = None
     r_sq_adj: float | None = None
     n_terminal = 0
-    with contextlib.suppress(LambdaZEstimationError):
+    nca_warnings: tuple[str, ...] = ()
+    try:
         lambda_z, r_sq_adj, n_terminal = _estimate_lambda_z(
             time, concentration, lambda_z_n_points, idx_cmax
         )
+    except LambdaZEstimationError as exc:
+        nca_warnings = (
+            f"lambda_z could not be estimated: {exc}. half_life, auc_inf, "
+            f"auc_pct_extrap, clearance and vz are therefore None.",
+        )
 
-    # ----- Extrapolated AUC and AUMC -----
+    # ----- AUMC to last measurable concentration -----
+    aumc_segments = _compute_aumc_segments(t_auc, c_auc, auc_method)
+    aumc_last = float(np.sum(aumc_segments))
+
+    # ----- Extrapolated AUC / AUMC and derived parameters -----
     auc_inf: float | None = None
     auc_pct_extrap: float | None = None
     half_life: float | None = None
     clearance: float | None = None
     vz: float | None = None
+    aumc_inf: float | None = None
+    mrt: float | None = None
 
     if lambda_z is not None and lambda_z > 0:
         half_life = np.log(2) / lambda_z
         c_last = concentration[idx_last]
+        t_last = time[idx_last]
 
         # AUC extrapolation: Clast / lambda_z
         auc_extrap = c_last / lambda_z
         auc_inf = auc_last + auc_extrap
         auc_pct_extrap = 100.0 * auc_extrap / auc_inf if auc_inf > 0 else 0.0
+
+        # AUMC extrapolation for C(t) = Clast*exp(-lambda_z*(t - t_last)):
+        # integral_{t_last}^inf t*C(t) dt = Clast*(t_last/lambda_z + 1/lambda_z^2)
+        aumc_extrap = c_last * (t_last / lambda_z + 1.0 / lambda_z**2)
+        aumc_inf = aumc_last + aumc_extrap
+        if auc_inf > 0:
+            mrt = aumc_inf / auc_inf
 
         # Dose-dependent parameters
         if dose is not None and auc_inf > 0:
@@ -505,6 +545,9 @@ def nca(
         lambda_z_r_squared=r_sq_adj,
         clearance=clearance,
         vz=vz,
+        aumc_last=aumc_last,
+        aumc_inf=aumc_inf,
+        mrt=mrt,
         dose=dose,
         route=route,
         auc_method=auc_method,
@@ -523,5 +566,6 @@ def nca(
         },
         timing=None,
         backend_name="cpu",
+        warnings=nca_warnings,
     )
     return NCASolution(result)

@@ -1,5 +1,72 @@
 # Changelog
 
+## 4.0.2
+
+### Summary
+
+4.0.2 fixes defects surfaced while assembling the formal validation evidence for
+4.0.1 — most importantly a silently-wrong relative potency for non-parallel
+asymmetric dose-response curves, and a silent failure in NCA. It also aligns the
+dose-response standard errors with R drc and implements the AUMC/MRT parameters
+the docstring already advertised.
+
+### Added
+
+- **`pk.nca()` now computes and exposes AUMC and MRT.** `.aumc_last` (area under
+  the first moment curve to the last measurable concentration), `.aumc_inf`
+  (extrapolated to infinity), and `.mrt` (mean residence time = AUMC_inf/AUC_inf)
+  are new `NCASolution` accessors — standard NCA parameters that the module
+  docstring listed but had never actually wired into the result. They match
+  `NonCompart::sNCA`'s AUMCLST/AUMCIFO/MRTEVIFO to ~1e-13.
+  (`pystatsbio/pk/_nca.py`, `pystatsbio/pk/_common.py`)
+- **`DoseResponseSolution` exposes the parameter covariance matrix** as `.cov`.
+
+### Changed
+
+- **Dose-response standard errors now use the observed-information covariance,
+  matching R drc.** `fit_drm` coefficient SEs, the `ec50()` delta-method SE, and
+  the `relative_potency()` Fieller interval previously used the Gauss-Newton
+  covariance `s²(JᵀJ)⁻¹`; they now use `s²(½H)⁻¹` (the inverse scaled RSS
+  Hessian), which is exactly what `drc::drm()`/`drc::ED()` report. The two are
+  asymptotically equivalent but differed by up to ~11% on the Hill-slope SE for
+  the log-logistic family (and ~1% on the EC50 CI width); coefficient SEs now
+  agree with drc's `summary()` to <1% and the EC50 SE to <4e-4. This is a small
+  user-visible change to the reported uncertainties (the point estimates are
+  unchanged). (`pystatsbio/doseresponse/_fit.py`, `_potency.py`)
+
+### Fixed
+
+- **`doseresponse.relative_potency()` now ratios the solved ED50s, not the raw `e`
+  parameters.** It previously divided the two fits' `e` location parameters. For
+  the symmetric LL.4 — and for any two *parallel* curves, where the `e`-to-ED50
+  factor is identical and cancels — that is the same number. For **non-parallel
+  asymmetric** fits (LL.5/W1.4/W2.4/BC.5) it is not the potency ratio at all: on a
+  non-parallel LL.5 pair it returned 1.70 where the true ED50 ratio is 0.40 — the
+  wrong magnitude *and* the wrong direction. It now uses the same solved ED50 (and
+  its delta-method SE) that `ec50()` returns, so it is correct regardless of
+  parallelism. Parallel-curve results are unchanged.
+  (`pystatsbio/doseresponse/_potency.py`)
+- **`pk.nca()` no longer fails silently when the terminal phase cannot be fitted.**
+  The `LambdaZEstimationError` was suppressed, returning `lambda_z` — and every
+  parameter derived from it (`half_life`, `auc_inf`, `auc_pct_extrap`, `clearance`,
+  `vz`) — as `None` with an **empty** `.warnings` tuple and no other signal. The
+  reason is now reported in `.warnings`. The degenerate all-zero-concentration
+  profile warns too. (`pystatsbio/pk/_nca.py`)
+
+### Documentation
+
+- `pk`: the module docstring claimed **AUMC and MRT** among the computed
+  parameters; neither is computed or exposed by `nca()` (the moment-curve helpers
+  are not wired into the result). The claim is removed and the omission stated.
+- `pk`: "Validates against PKNCA" removed — PKNCA uses a different default
+  terminal-slope selection and is not a validated reference for this module. The
+  validated reference is `NonCompart::sNCA()`.
+- README: `relative_potency()` was listed as `drc::EDcomp()` **"with parallelism
+  test"** — no parallelism test is performed. The entry now states what the
+  function actually does (ratio of ED50s with a Fieller interval), and the
+  docstring notes that assessing parallelism is the caller's responsibility.
+
+
 ## 4.0.1
 
 ### Summary

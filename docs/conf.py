@@ -4,8 +4,8 @@
 project = 'PyStatsBio'
 copyright = '2026, SGCX'
 author = 'Hai-Shuo'
-version = '4.0.1'
-release = '4.0.1'
+version = '4.0.2'
+release = '4.0.2'
 
 # -- General configuration ---------------------------------------------------
 

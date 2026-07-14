@@ -295,7 +295,7 @@ print(result.summary())
 | `fit_drm()` | `drc::drm()` |
 | `fit_drm_batch()` | vectorized `drc::drm()` |
 | `ec50()` | `drc::ED()` |
-| `relative_potency()` | `drc::EDcomp()` with parallelism test |
+| `relative_potency()` | `drc::EDcomp()` (ratio of ED50s, Fieller CI) |
 | `bmd()` | `drc::bmd()` / `BMDS` |
 
 Models: `LL.4` (4PL), `LL.5` (5PL), `W1.4` (Weibull-1), `W2.4` (Weibull-2),

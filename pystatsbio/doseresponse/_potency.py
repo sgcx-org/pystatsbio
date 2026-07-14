@@ -27,7 +27,6 @@ from scipy.stats import norm
 from scipy.stats import t as t_dist
 
 from pystatsbio.doseresponse._common import CurveParams, DoseResponseSolution
-from pystatsbio.doseresponse._models import _MODEL_MAP
 
 
 @dataclass(frozen=True)
@@ -211,9 +210,9 @@ def _solve_ed50(curve: CurveParams, e_hint: float) -> float:
 def _ed50_delta_se(fit_result: DoseResponseSolution, ed50: float) -> float:
     """Delta-method SE of the solved ED50, matching drc::ED(interval="delta").
 
-    Uses the full parameter covariance reconstructed from the fit Jacobian,
-    ``cov = (rss/(n-p)) · (JᵀJ)⁻¹``, and the gradient of ED50 with respect to
-    the parameters (finite differences, re-solving ED50 at each perturbation).
+    Uses the fit's parameter covariance (observed information, the same matrix
+    drc uses) and the gradient of ED50 with respect to the parameters (finite
+    differences, re-solving ED50 at each perturbation).
     """
     model = fit_result.model
     theta = fit_result.params.to_array()
@@ -222,11 +221,8 @@ def _ed50_delta_se(fit_result: DoseResponseSolution, ed50: float) -> float:
     if n_obs <= n_p or not (np.isfinite(ed50) and ed50 > 0):
         return float("nan")
 
-    jac = fit_result.jac
-    s2 = fit_result.rss / (n_obs - n_p)
-    try:
-        cov = np.linalg.inv(jac.T @ jac) * s2
-    except np.linalg.LinAlgError:
+    cov = fit_result.cov
+    if cov is None or not np.all(np.isfinite(cov)):
         return float("nan")
 
     grad = np.zeros(n_p)
@@ -321,10 +317,21 @@ def relative_potency(
     *,
     conf_level: float = 0.95,
 ) -> RelativePotencySolution:
-    """Relative potency: ratio of EC50s between two curves with Fieller's CI.
+    """Relative potency: ratio of EC50s (ED50s) between two curves, Fieller's CI.
 
-    Computes ``rho = EC50_2 / EC50_1`` with a confidence interval based on
+    Computes ``rho = ED50_2 / ED50_1`` with a confidence interval based on
     Fieller's theorem for the ratio of two independent estimates.
+
+    Both ED50s are obtained by solving each fitted curve for its half-maximal
+    response (the same quantity :func:`ec50` returns), *not* by ratioing the raw
+    ``e`` location parameters. For the symmetric LL.4 — and for any two *parallel*
+    curves, where the ``e``-to-ED50 factor is identical and cancels — the two are
+    the same. They differ for non-parallel asymmetric fits (LL.5/W1.4/W2.4/BC.5),
+    where ratioing ``e`` would not be the potency ratio at all.
+
+    Note this function does **not** test parallelism; relative potency is only
+    meaningful for curves of the same shape, and assessing that is the caller's
+    responsibility.
 
     Parameters
     ----------
@@ -344,12 +351,12 @@ def relative_potency(
     if not (0.0 < conf_level < 1.0):
         raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
-    _, names1 = _MODEL_MAP[fit1.model]
-    _, names2 = _MODEL_MAP[fit2.model]
-    e1 = fit1.params.ec50
-    e2 = fit2.params.ec50
-    se1 = float(fit1.se[names1.index("ec50")])
-    se2 = float(fit2.se[names2.index("ec50")])
+    # Solved ED50s (half-maximal doses), consistent with ec50(), plus their
+    # delta-method SEs — NOT the raw `e` parameters.
+    e1 = _solve_ed50(fit1.params, fit1.params.ec50)
+    e2 = _solve_ed50(fit2.params, fit2.params.ec50)
+    se1 = _ed50_delta_se(fit1, e1)
+    se2 = _ed50_delta_se(fit2, e2)
 
     ratio = e2 / e1 if e1 != 0 else float("nan")
 

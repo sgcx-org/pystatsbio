@@ -11,6 +11,8 @@ Validates against: R drc::drm()
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ValidationError
@@ -155,36 +157,79 @@ def _initial_params(
 # Standard error computation
 # ---------------------------------------------------------------------------
 
-def _compute_se(
+def _rss_hessian(
+    rss_fn: Callable[[NDArray], float],
+    popt: NDArray,
+    rel_step: float = 1e-4,
+) -> NDArray[np.floating]:
+    """Numerical Hessian of the RSS objective at ``popt`` (central differences).
+
+    Second-derivative central differences have error O(h^2) + O(eps_machine/h^2),
+    so the step is taken relative to each parameter's own scale.
+    """
+    p = len(popt)
+    h = rel_step * np.maximum(np.abs(popt), 1.0)
+    H = np.empty((p, p), dtype=np.float64)
+    for j in range(p):
+        for k in range(j, p):
+            ej = np.zeros(p); ej[j] = h[j]
+            ek = np.zeros(p); ek[k] = h[k]
+            val = (
+                rss_fn(popt + ej + ek)
+                - rss_fn(popt + ej - ek)
+                - rss_fn(popt - ej + ek)
+                + rss_fn(popt - ej - ek)
+            ) / (4.0 * h[j] * h[k])
+            H[j, k] = H[k, j] = val
+    return H
+
+
+def _compute_cov_se(
+    rss_fn: Callable[[NDArray], float],
+    popt: NDArray,
     jac: NDArray,
     rss: float,
     n_obs: int,
     n_params: int,
-) -> NDArray[np.floating]:
-    """Standard errors from Jacobian: ``se = sqrt(diag((J'J)^{-1} * s²))``.
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Parameter covariance and standard errors from the OBSERVED information.
 
-    Parameters
-    ----------
-    jac : (n_obs, n_params)
-        Jacobian of the residual vector at the solution.
-    rss : float
-        Residual sum of squares.
-    n_obs, n_params : int
-        Number of observations and parameters.
+    The covariance is ``cov = s2 * (H/2)^-1 = 2*s2*H^-1`` where ``H`` is the
+    Hessian of the residual sum of squares and ``s2 = RSS/(n-p)``. Equivalently
+    ``(J'J + sum_i r_i * d2r_i)^-1 * s2`` — i.e. Gauss-Newton PLUS the
+    second-order curvature term.
+
+    This is what R ``drc::drm()`` reports (its ``vcCont`` inverts the scaled RSS
+    Hessian), and it is the reference this module validates against. The
+    Gauss-Newton approximation ``s2*(J'J)^-1`` drops the curvature term; both are
+    asymptotically valid, but on a curved model they differ materially along
+    poorly-conditioned directions (up to ~11% on the Hill slope for the log-logistic
+    family), so we match the reference rather than the cheaper approximation.
+
+    Falls back to Gauss-Newton if the Hessian is singular or not usable.
     """
     if n_obs <= n_params:
-        return np.full(n_params, np.nan)
+        nan = np.full(n_params, np.nan)
+        return np.full((n_params, n_params), np.nan), nan
 
     s2 = rss / (n_obs - n_params)
-    JtJ = jac.T @ jac
 
     try:
-        cov = np.linalg.inv(JtJ) * s2
-        se = np.sqrt(np.maximum(np.diag(cov), 0.0))
-    except np.linalg.LinAlgError:
-        se = np.full(n_params, np.nan)
+        H = _rss_hessian(rss_fn, popt)
+        cov = 2.0 * s2 * np.linalg.inv(H)
+        diag = np.diag(cov)
+        if not np.all(np.isfinite(diag)) or np.any(diag < 0):
+            raise np.linalg.LinAlgError("non-positive observed-information variance")
+    except (np.linalg.LinAlgError, ValueError, FloatingPointError):
+        # Fall back to the Gauss-Newton covariance.
+        try:
+            cov = np.linalg.inv(jac.T @ jac) * s2
+        except np.linalg.LinAlgError:
+            nan = np.full(n_params, np.nan)
+            return np.full((n_params, n_params), np.nan), nan
 
-    return se
+    se = np.sqrt(np.maximum(np.diag(cov), 0.0))
+    return cov, se
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +270,16 @@ def fit_drm(
     Returns
     -------
     DoseResponseSolution
+
+    Notes
+    -----
+    Parameter standard errors (``.se``) and the covariance (``.cov``) use the
+    **observed-information** covariance ``s²·(½H)⁻¹`` — the inverse of the scaled
+    Hessian of the residual sum of squares, ``s² = RSS/(n-p)`` — which is what R
+    ``drc::drm()`` reports. This differs from the Gauss-Newton approximation
+    ``s²·(JᵀJ)⁻¹`` used by ``scipy.optimize.curve_fit`` / R ``nls`` by the
+    second-order curvature term; the two are asymptotically equivalent but can
+    differ by ~10% on a poorly-conditioned coefficient (e.g. the Hill slope).
 
     Examples
     --------
@@ -372,7 +427,16 @@ def fit_drm(
     n_iter = result.nfev
 
     jac = result.jac
-    se = _compute_se(jac, rss, n_obs, n_params)
+
+    def _rss_of(theta: NDArray) -> float:
+        """RSS at an arbitrary parameter vector (same objective the fit minimised)."""
+        kwargs = dict(zip(param_names, theta, strict=True))
+        r = response - model_func(dose, **kwargs)
+        if weights is not None:
+            r = r * np.sqrt(weights)
+        return float(np.sum(r**2))
+
+    cov, se = _compute_cov_se(_rss_of, popt, jac, rss, n_obs, n_params)
 
     # AIC / BIC
     aic = float(n_obs * np.log(rss / n_obs) + 2 * n_params)
@@ -383,6 +447,7 @@ def fit_drm(
     params = DoseResponseParams(
         curve=curve_params,
         se=se,
+        cov=cov,
         residuals=res_vec,
         rss=rss,
         aic=aic,
