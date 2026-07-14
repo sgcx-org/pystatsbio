@@ -16,17 +16,41 @@ Supports four GLM families via pystatistics:
   - Poisson (log link)
   - Gamma (inverse link)
 
-Moment-estimator convention: the dispersion (``.scale``) and the working-
-correlation parameter (``.alpha``) use a degrees-of-freedom correction —
-``sum(pearson^2)/(N - p)`` for the scale and an ``(Nstar - p)`` denominator for
-the correlation — matching statsmodels GEE. R ``geepack::geeglm`` (geese) uses
-``N`` and ``Nstar`` with no ``-p`` correction, so ``.scale``/``.alpha`` differ
-from geepack by roughly ``N/(N-p)`` (typically <1-2%). This does **not** reach
-the inferential outputs: the coefficients and the robust (sandwich) standard
-errors agree with geepack to ~1e-5, because the dispersion cancels in both the
-coefficient update and the sandwich covariance.
+Correlation-parameter estimator (important — the two R GEE packages differ):
+The working-correlation parameters are estimated by the classical **Liang-Zeger
+(1986) method-of-moments** estimator. For AR(1) this means alpha is the lag-1
+(adjacent-pair) Pearson-residual moment — the same convention as R
+``gee::gee(corstr="AR-M", Mv=1)`` and **SAS PROC GENMOD**.
 
-Validates against: R geepack::geeglm() (coefficients and robust SE)
+R ``geepack::geeglm`` (geese) instead uses the Yan & Fine (2004) approach, which
+solves a *second estimating equation* fitting the full ``alpha^|i-j|`` Toeplitz
+structure across **all** lag pairs. Both estimators are consistent when AR(1) is
+correctly specified (they recover the same true alpha), but they converge to
+*different* limits when AR(1) is misspecified — pystatsbio/SAS to the true lag-1
+correlation, geepack to an all-lag compromise. So pystatsbio's AR(1) alpha (and
+the beta/robust SE it induces) matches ``gee::gee``/SAS, and will differ from
+``geepack::geeglm`` on data whose correlation is not truly geometric.
+Independence and exchangeable agree with geepack to ~1e-5 on beta and robust SE.
+
+Moment-estimator convention: the dispersion (``.scale``) and the working-
+correlation parameter use a degrees-of-freedom correction —
+``sum(pearson^2)/(N - p)`` for the scale and an ``(Nstar - p)`` denominator for
+the correlation — matching statsmodels GEE. ``geepack`` uses ``N`` and ``Nstar``
+with no ``-p`` correction, so these differ by roughly ``N/(N-p)`` (typically
+<1-2%). This does **not** reach the inferential outputs: the dispersion cancels
+in both the coefficient update and the sandwich covariance.
+
+Validates against: R ``gee::gee()`` / SAS PROC GENMOD (Liang-Zeger correlation
+estimator, all structures); R ``geepack::geeglm()`` for coefficients and robust
+SE under independence and exchangeable.
+
+References
+----------
+Liang, K.-Y. & Zeger, S. L. (1986). Longitudinal data analysis using generalized
+linear models. *Biometrika*, 73(1), 13-22.
+
+Yan, J. & Fine, J. (2004). Estimating equations for association structures.
+*Statistics in Medicine*, 23(6), 859-874.
 """
 
 from __future__ import annotations

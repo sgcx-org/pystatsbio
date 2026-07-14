@@ -341,7 +341,15 @@ Routes: `iv` (intravenous), `ev` (extravascular).
 
 | Function | R equivalent |
 |----------|--------------|
-| `gee()` | `geepack::geeglm()` |
+| `gee()` | `gee::gee()` / SAS `PROC GENMOD` (Liang-Zeger); `geepack::geeglm()` |
+
+The working-correlation parameters use the classical **Liang-Zeger (1986)**
+method-of-moments estimator — for AR(1), the lag-1 adjacent-pair moment, the same
+convention as `gee::gee(corstr="AR-M", Mv=1)` and **SAS PROC GENMOD**.
+`geepack::geeglm` instead uses the Yan & Fine (2004) all-lag estimating equation;
+both are consistent when AR(1) is correctly specified, but they differ when it is
+not. Coefficients and robust SE match `geepack` under independence and
+exchangeable.
 
 Families: `gaussian`, `binomial`, `poisson`.
 Correlation structures: `independence`, `exchangeable`, `ar1`, `unstructured`.

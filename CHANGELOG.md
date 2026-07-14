@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.0.1
+
+### Summary
+
+4.0.1 corrects the documented reference for the `gee` working-correlation
+estimator. No numeric behaviour changes.
+
+### Documentation
+
+- **`gee` now states its correlation estimator and cites the right reference.**
+  The working-correlation parameters use the classical **Liang-Zeger (1986)**
+  method of moments — for AR(1), the lag-1 adjacent-pair Pearson-residual moment,
+  the same convention as R `gee::gee(corstr="AR-M", Mv=1)` and **SAS PROC
+  GENMOD**. The docs previously cited only `geepack::geeglm()`, which uses the
+  Yan & Fine (2004) *all-lag* estimating equation for the AR(1) correlation and so
+  is **not** the matching reference for that structure. Both estimators are
+  consistent when AR(1) is correctly specified (both recover the true alpha), but
+  they converge to different limits when AR(1) is misspecified — pystatsbio/SAS to
+  the true lag-1 correlation, geepack to an all-lag compromise. Coefficients and
+  robust SE still match `geepack` under independence and exchangeable.
+  (`pystatsbio/gee/__init__.py`, `README.md`)
+
+
 ## 4.0.0
 
 ### Summary
