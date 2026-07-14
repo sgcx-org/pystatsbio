@@ -308,28 +308,32 @@ def _estimate_lambda_z(
         r_sq = r_value ** 2
         r_sq_adj = 1.0 - (1.0 - r_sq) * (n_fit - 1) / (n_fit - 2) if n_fit > 2 else r_sq
     else:
-        # Auto-select: try 3 to len(candidates) points from the end,
-        # pick the one with best adjusted R-squared
-        best_r_sq_adj = -np.inf
-        best_slope = None
-        best_n = 0
-
+        # Auto-select the terminal window by the "Adjusted R-squared Best Fit"
+        # (ARS) rule used by Phoenix WinNonlin / R NonCompart::sNCA: fit the last
+        # 3..all eligible points, find the maximum adjusted R-squared, then choose
+        # the window with the MOST points whose adjusted R-squared is within 0.0001
+        # of that maximum. Preferring more points on a near-tie (rather than the
+        # strict argmax) is the pharmacometrics standard and matches the reference
+        # NCA tools.
+        fits = []  # (n_try, slope, r_sq_adj)
         for n_try in range(3, len(candidates) + 1):
             idx_use = candidates[-n_try:]
-            t_fit = time[idx_use]
-            log_c_fit = np.log(concentration[idx_use])
-            s, _, r_value, _, _ = stats.linregress(t_fit, log_c_fit)
+            s, _, r_value, _, _ = stats.linregress(
+                time[idx_use], np.log(concentration[idx_use])
+            )
             r_sq = r_value ** 2
             r_sq_adj_try = 1.0 - (1.0 - r_sq) * (n_try - 1) / (n_try - 2)
+            fits.append((n_try, s, r_sq_adj_try))
 
-            if r_sq_adj_try > best_r_sq_adj:
-                best_r_sq_adj = r_sq_adj_try
-                best_slope = s
-                best_n = n_try
-
-        slope = best_slope
-        r_sq_adj = best_r_sq_adj
-        n_fit = best_n
+        # A flat/degenerate profile gives a non-finite adjusted R-squared; drop
+        # those so the elimination-phase check below fails loud (lambda_z=None).
+        finite_fits = [f for f in fits if np.isfinite(f[2])]
+        if not finite_fits:
+            slope, r_sq_adj, n_fit = None, float("nan"), 0
+        else:
+            max_adj = max(f[2] for f in finite_fits)
+            eligible = [f for f in finite_fits if f[2] >= max_adj - 1e-4]
+            n_fit, slope, r_sq_adj = max(eligible, key=lambda f: f[0])
 
     # lambda_z must be positive (slope should be negative for elimination)
     if slope is None or slope >= 0:

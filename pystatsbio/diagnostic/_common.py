@@ -34,7 +34,8 @@ class ROCParams:
     auc_se : float
         DeLong standard error of the AUC.
     auc_ci_lower, auc_ci_upper : float
-        Confidence interval for AUC (logit-transformed DeLong).
+        Confidence interval for AUC (symmetric Wald DeLong on the AUC scale,
+        clamped to [0, 1]).
     conf_level : float
         Confidence level used for CI.
     n_positive, n_negative : int

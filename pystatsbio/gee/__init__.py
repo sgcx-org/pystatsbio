@@ -16,7 +16,17 @@ Supports four GLM families via pystatistics:
   - Poisson (log link)
   - Gamma (inverse link)
 
-Validates against: R geepack::geeglm()
+Moment-estimator convention: the dispersion (``.scale``) and the working-
+correlation parameter (``.alpha``) use a degrees-of-freedom correction —
+``sum(pearson^2)/(N - p)`` for the scale and an ``(Nstar - p)`` denominator for
+the correlation — matching statsmodels GEE. R ``geepack::geeglm`` (geese) uses
+``N`` and ``Nstar`` with no ``-p`` correction, so ``.scale``/``.alpha`` differ
+from geepack by roughly ``N/(N-p)`` (typically <1-2%). This does **not** reach
+the inferential outputs: the coefficients and the robust (sandwich) standard
+errors agree with geepack to ~1e-5, because the dispersion cancels in both the
+coefficient update and the sandwich covariance.
+
+Validates against: R geepack::geeglm() (coefficients and robust SE)
 """
 
 from __future__ import annotations

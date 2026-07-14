@@ -136,13 +136,24 @@ def power_crossover_be(
     -------
     PowerSolution
 
+    Notes
+    -----
+    Power is computed with the noncentral-t approximation — PowerTOST's
+    ``method="nct"`` — which sums the two one-sided noncentral-t tail
+    probabilities. This differs from PowerTOST's default ``method="exact"``
+    (Owen's Q), which accounts for the correlation between the two TOST
+    statistics, by up to ~1e-2 in *power* at low power / high CV; the two agree
+    to ~1e-12 when PowerTOST is also run with ``method="nct"``. The **sample
+    size** is unaffected — ``nct`` and ``exact`` select the same n.
+
     Examples
     --------
     >>> r = power_crossover_be(coef_variation=0.30, power=0.80)
     >>> r.n  # total subjects
     36
 
-    Validates against: R PowerTOST::sampleN.TOST(), PowerTOST::power.TOST()
+    Validates against: R PowerTOST::power.TOST(method="nct"),
+    PowerTOST::sampleN.TOST()
     """
     # --- Validate ---
     if coef_variation is None:

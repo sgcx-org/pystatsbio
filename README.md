@@ -22,6 +22,29 @@ Each function states exactly which R function it replicates and to what toleranc
 
 ---
 
+## What's New in 4.0
+
+Version 4.0 is a correctness release from a full validation sweep of every module
+against its R reference (drc, PKNCA/NonCompart, pROC/epiR, pwr/PowerTOST, metafor,
+geepack). It fixes several results that were silently wrong and now agree with the
+R references to tight tolerances:
+
+- **`doseresponse.ec50()`** returns the true EC50/ED50 for the asymmetric models
+  (LL.5, W1.4, W2.4, BC.5), by solving the fitted curve for the half-maximal dose
+  rather than returning the raw location parameter (which was off by up to ~27%).
+- **`doseresponse.fit_drm(model="W2.4")`** no longer converges to an inferior local
+  optimum on decreasing data.
+- **`epi.epi_2by2`** population attributable fraction now uses the exposure
+  prevalence in Levin's formula.
+- **`meta.rma`** reports estimator-specific I²/H² (the default REML/PM previously
+  reported the DerSimonian-Laird value).
+- **`pk.nca`** terminal-slope selection uses the WinNonlin/NonCompart "best-fit"
+  rule, matching the reference tools.
+
+**Breaking change:** `epi.rate_standardize(method="indirect")` now requires a
+`standard_weights` argument (the standard population's age distribution) to compute
+the standardized rate — previously it was silently wrong. The SIR is unaffected.
+
 ## What's New in 3.0
 
 Version 3.0 tracks the PyStatistics 5.0 API. **It requires `pystatistics>=5.0`**
@@ -254,16 +277,16 @@ print(result.summary())
 | `power_t_test()` | `pwr::pwr.t.test()` |
 | `power_paired_t_test()` | `pwr::pwr.t.test(type="paired")` |
 | `power_prop_test()` | `pwr::pwr.2p.test()` |
-| `power_fisher_test()` | `TrialSize::TwoSampleProportion.Equality()` |
+| `power_fisher_test()` | `pwr::pwr.2p.test()` (via Cohen's h) |
 | `power_logrank()` | `gsDesign::nSurv()` |
 | `power_anova_oneway()` | `pwr::pwr.anova.test()` |
-| `power_anova_factorial()` | `TrialSize::FactorialDesign()` |
+| `power_anova_factorial()` | `pwr::pwr.f2.test()` |
 | `power_noninf_mean()` | `TrialSize::TwoSampleMean.NIS()` |
 | `power_noninf_prop()` | `TrialSize::TwoSampleProportion.NIS()` |
 | `power_equiv_mean()` | `TrialSize::TwoSampleMean.Equivalence()` |
-| `power_superiority_mean()` | `TrialSize::TwoSampleMean.Superiority()` |
-| `power_crossover_be()` | `PowerTOST::sampleSize()` |
-| `power_cluster()` | `samplesize::n.twogroup()` with ICC |
+| `power_superiority_mean()` | `TrialSize::TwoSampleMean.NIS()` |
+| `power_crossover_be()` | `PowerTOST::sampleN.TOST()`, `power.TOST(method="nct")` |
+| `power_cluster()` | `clusterPower`, `CRTSize` (ICC-adjusted) |
 
 ### `doseresponse` — Dose-Response Modeling
 

@@ -155,12 +155,13 @@ def _population_attributable_fraction(
     """Population attributable fraction via Levin's formula.
 
     PAF = pe * (RR - 1) / (pe * (RR - 1) + 1)
-    where pe = (a+c) / (a+b+c+d) is prevalence of exposure.
+    where pe = (a+b) / (a+b+c+d) is the prevalence of exposure (the row-1
+    marginal, since risk ratios here treat rows as the exposed/unexposed groups).
 
     CI: Levin's formula applied to RR CI bounds.
     """
     n = a + b + c + d
-    pe = (a + c) / n
+    pe = (a + b) / n
 
     def _levin(r: float) -> float:
         return pe * (r - 1.0) / (pe * (r - 1.0) + 1.0)

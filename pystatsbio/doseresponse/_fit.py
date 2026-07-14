@@ -265,6 +265,7 @@ def fit_drm(
             raise ValidationError("weights must have same shape as dose")
 
     # --- Starting values ---
+    start_was_none = start is None
     if start is None:
         start = _initial_params(dose, response, model)
     x0 = np.array([start[name] for name in param_names], dtype=np.float64)
@@ -286,15 +287,6 @@ def fit_drm(
     # Ensure starting values are within bounds
     x0 = np.clip(x0, lb + 1e-15, ub - 1e-15)
 
-    # --- Fast path: MINPACK LM with log(ec50) reparameterisation ---
-    #
-    # MINPACK's lmder Fortran routine runs the entire LM loop in compiled
-    # code, giving ~8× speedup over scipy's Python-level TRF loop.
-    # Reparameterising ec50 → log(ec50) removes the positivity bound,
-    # allowing method='lm' (which doesn't support bounds).
-    #
-    # Falls back to TRF for: custom bounds, weighted fits, non-LL.4 models
-    # without analytical Jacobians, or when LM fails to converge.
     jac_log_func = _JAC_LOG_MAP.get(model)
     use_lm = (
         jac_log_func is not None
@@ -302,66 +294,75 @@ def fit_drm(
         and not has_custom_bounds
     )
 
-    if use_lm:
-        # --- Fast path: MINPACK Fortran LM ---
-        x0_log = x0.copy()
-        x0_log[ec50_idx] = np.log(max(x0[ec50_idx], 1e-20))
+    def _fit_from(x0_in: NDArray):
+        """Run one least-squares fit from a single starting point.
 
-        def residuals_log(p: NDArray) -> NDArray:
-            p_real = p.copy()
-            p_real[ec50_idx] = np.exp(p[ec50_idx])
-            kwargs = dict(zip(param_names, p_real, strict=True))
-            return response - model_func(dose, **kwargs)
+        Fast path: MINPACK LM (compiled lmder, ~8× over scipy's Python TRF
+        loop) with an ec50 → log(ec50) reparameterisation that removes the
+        positivity bound so method='lm' can be used. Slow path (custom bounds,
+        weighted fits, or models without an analytical Jacobian): TRF.
+        """
+        if use_lm:
+            x0_log = x0_in.copy()
+            x0_log[ec50_idx] = np.log(max(x0_in[ec50_idx], 1e-20))
 
-        def jac_log(p: NDArray) -> NDArray:
-            return jac_log_func(dose, p)
+            def residuals_log(p: NDArray) -> NDArray:
+                p_real = p.copy()
+                p_real[ec50_idx] = np.exp(p[ec50_idx])
+                kwargs = dict(zip(param_names, p_real, strict=True))
+                return response - model_func(dose, **kwargs)
 
-        # max_nfev=200: converged fits use ~20-50 evals; 200 is generous.
-        # Unconverged data (flat responses, pure noise) should fail fast
-        # rather than burn 2000 evals at ~25µs each.
-        with np.errstate(over="ignore", invalid="ignore"):
-            result = least_squares(
-                residuals_log,
-                x0_log,
-                method="lm",
-                jac=jac_log,
-                max_nfev=200,
-                xtol=1e-12,
-                ftol=1e-12,
-                gtol=1e-12,
-            )
-        # Convert log(ec50) back to ec50
-        ec50_fitted = np.exp(result.x[ec50_idx])
-        result.x[ec50_idx] = ec50_fitted
-        # Transform Jacobian column from log-space to natural-space:
-        # ∂r/∂ec50 = ∂r/∂log_ec50 · ∂log_ec50/∂ec50 = ∂r/∂log_ec50 / ec50
-        if np.isfinite(ec50_fitted) and ec50_fitted > 0:
-            result.jac[:, ec50_idx] /= ec50_fitted
-        else:
-            result.success = False
-    else:
-        # --- Slow path: TRF with bounds ---
-        # Used when: custom bounds specified, weights given, or no
-        # analytical Jacobian for this model.
+            with np.errstate(over="ignore", invalid="ignore"):
+                res = least_squares(
+                    residuals_log, x0_log, method="lm",
+                    jac=lambda p: jac_log_func(dose, p),
+                    max_nfev=200, xtol=1e-12, ftol=1e-12, gtol=1e-12,
+                )
+            ec50_fitted = np.exp(res.x[ec50_idx])
+            res.x[ec50_idx] = ec50_fitted
+            # log-space → natural-space Jacobian column: ∂r/∂ec50 = ∂r/∂log_ec50 / ec50
+            if np.isfinite(ec50_fitted) and ec50_fitted > 0:
+                res.jac[:, ec50_idx] /= ec50_fitted
+            else:
+                res.success = False
+            return res
+
         def residuals(p: NDArray) -> NDArray:
             kwargs = dict(zip(param_names, p, strict=True))
-            pred = model_func(dose, **kwargs)
-            r = response - pred
+            r = response - model_func(dose, **kwargs)
             if weights is not None:
                 r = r * np.sqrt(weights)
             return r
 
-        result = least_squares(
-            residuals,
-            x0,
-            method="trf",
-            bounds=(lb, ub),
-            jac="2-point",
-            max_nfev=2000,
-            xtol=1e-12,
-            ftol=1e-12,
-            gtol=1e-12,
+        return least_squares(
+            residuals, x0_in, method="trf", bounds=(lb, ub), jac="2-point",
+            max_nfev=2000, xtol=1e-12, ftol=1e-12, gtol=1e-12,
         )
+
+    # --- Candidate starting points ---
+    # The Weibull-2 (W2.4) model has a mirror-image local optimum (swap the
+    # asymptotes, negate the Hill slope). On decreasing data the data-driven
+    # self-start seeds the wrong basin and converges silently to a ~14%-worse
+    # RSS with swapped asymptotes. For an auto-start W2.4 fit, also try the
+    # mirror start and keep whichever reaches the lower RSS — which recovers the
+    # natural-label global optimum. Multistart never worsens a fit (it keeps the
+    # better of the two). W1.4 is left untouched: it is the same curve family
+    # with asymptotes labelled oppositely, so mirroring it would flip its labels;
+    # its self-start already matches the reference.
+    candidates = [x0]
+    if start_was_none and model == "W2.4":
+        b_i, t_i, h_i = (param_names.index("bottom"),
+                         param_names.index("top"), param_names.index("hill"))
+        mirror = x0.copy()
+        mirror[b_i], mirror[t_i] = x0[t_i], x0[b_i]
+        mirror[h_i] = -x0[h_i]
+        mirror = np.clip(mirror, lb + 1e-15, ub - 1e-15)
+        candidates.append(mirror)
+
+    result = min(
+        (_fit_from(c) for c in candidates),
+        key=lambda r: float(np.sum(r.fun**2)),
+    )
 
     # --- Extract ---
     popt = result.x

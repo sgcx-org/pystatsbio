@@ -67,11 +67,15 @@ def _direct_standardize(
 
     adjusted_rate = sum(rate_i * weight_i) / sum(weight_i)
 
-    SE via Fay-Feuer (gamma-based) approach:
-        var = sum(weight_i^2 * count_i / person_time_i^2)
-        SE = sqrt(var) / sum(weight_i)
+    Standard error of the directly standardized rate:
+        var = sum(weight_i^2 * count_i / person_time_i^2) / sum(weight_i)^2
+        SE = sqrt(var)
 
-    CI: normal approximation on the adjusted rate.
+    CI: normal approximation (adjusted_rate +/- z*SE). Note this differs from
+    R epitools::ageadjust.direct, which forms the CI via the Fay-Feuer gamma
+    method; the point estimate and this variance match epitools exactly, but the
+    interval endpoints differ (the normal approximation is a standard,
+    deliberately simpler choice).
     """
     rates = counts / person_time
     total_weight = np.sum(standard_pop)
@@ -110,6 +114,7 @@ def _indirect_standardize(
     counts: np.ndarray,
     person_time: np.ndarray,
     standard_rates: np.ndarray,
+    standard_weights: np.ndarray,
     conf_level: float,
 ) -> StandardizedRateParams:
     """Indirect age standardization.
@@ -118,7 +123,9 @@ def _indirect_standardize(
     SIR = observed / expected
 
     CI: exact Poisson CI on observed count, divided by expected.
-    The adjusted rate is SIR * crude_standard_rate.
+    The indirectly standardized rate is SIR * standard-population crude rate,
+    where the standard crude rate is the ``standard_weights``-weighted average of
+    the standard rates (i.e. the standard population's own age distribution).
     """
     observed = float(np.sum(counts))
     expected = float(np.sum(standard_rates * person_time))
@@ -133,12 +140,14 @@ def _indirect_standardize(
 
     crude_rate = float(np.sum(counts) / np.sum(person_time))
 
-    # Crude rate in the standard population (weighted average of standard rates)
-    # For indirect method, we use SIR * overall standard rate as adjusted rate
-    overall_standard_rate = float(
-        np.sum(standard_rates * person_time) / np.sum(person_time)
+    # Standard population's crude rate = its age-distribution-weighted average of
+    # the standard rates. This requires the standard population's stratum sizes
+    # (standard_weights); the previous code weighted by the STUDY person-time,
+    # which algebraically collapsed the standardized rate to the study crude rate.
+    standard_crude_rate = float(
+        np.sum(standard_rates * standard_weights) / np.sum(standard_weights)
     )
-    adjusted_rate = sir * overall_standard_rate
+    adjusted_rate = sir * standard_crude_rate
 
     # Exact Poisson CI for observed count
     alpha = 1 - conf_level
@@ -152,8 +161,8 @@ def _indirect_standardize(
     sir_lower = obs_lower / expected
     sir_upper = obs_upper / expected
 
-    adj_ci_lower = sir_lower * overall_standard_rate
-    adj_ci_upper = sir_upper * overall_standard_rate
+    adj_ci_lower = sir_lower * standard_crude_rate
+    adj_ci_upper = sir_upper * standard_crude_rate
 
     return StandardizedRateParams(
         crude_rate=crude_rate,
@@ -176,6 +185,7 @@ def rate_standardize(
     standard_pop: ArrayLike,
     *,
     method: str = "direct",
+    standard_weights: ArrayLike | None = None,
     conf_level: float = 0.95,
 ) -> StandardizedRateSolution:
     """Age-standardize rates using direct or indirect method.
@@ -192,8 +202,12 @@ def rate_standardize(
         expected = sum(standard_rate_i * person_time_i)
         SIR = observed / expected
         CI: exact Poisson CI on observed, divided by expected
+        standardized rate = SIR * standard-population crude rate
 
-        For indirect, standard_pop should be standard RATES, not populations.
+        For indirect, standard_pop should be standard RATES, not populations, and
+        ``standard_weights`` (the standard population's stratum sizes) is required
+        to compute the standardized rate — its crude rate is the
+        ``standard_weights``-weighted average of the standard rates.
 
     Parameters
     ----------
@@ -205,6 +219,11 @@ def rate_standardize(
         Standard population weights (direct) or standard rates (indirect).
     method : str
         'direct' or 'indirect'.
+    standard_weights : array-like or None
+        Standard population's stratum sizes (its age distribution). Required for
+        ``method='indirect'`` to compute the standardized rate; ignored for
+        ``'direct'``. Matches the ``stdpop`` argument of
+        ``epitools::ageadjust.indirect``.
     conf_level : float
         Confidence level for intervals. Must be in (0, 1).
 
@@ -234,7 +253,20 @@ def rate_standardize(
     if method == "direct":
         params = _direct_standardize(c, pt, sp, conf_level)
     else:
-        params = _indirect_standardize(c, pt, sp, conf_level)
+        if standard_weights is None:
+            raise ValidationError(
+                "method='indirect' requires standard_weights (the standard "
+                "population's stratum sizes) to compute the standardized rate; "
+                "got None. The SIR alone does not need it, but the standardized "
+                "rate = SIR * standard-population crude rate does."
+            )
+        sw = np.asarray(standard_weights, dtype=np.float64)
+        if sw.shape != c.shape:
+            raise ValidationError(
+                f"standard_weights must have the same shape as counts, got "
+                f"{sw.shape} and {c.shape}"
+            )
+        params = _indirect_standardize(c, pt, sp, sw, conf_level)
 
     result = Result(
         params=params,

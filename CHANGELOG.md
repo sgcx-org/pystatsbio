@@ -1,5 +1,99 @@
 # Changelog
 
+## 4.0.0
+
+### Summary
+
+4.0.0 is a correctness bundle from the first full validation sweep of every
+subsystem against its R reference (drc, PKNCA/NonCompart, pROC/epiR, pwr/PowerTOST,
+epiR/epitools, metafor, geepack). It fixes several silently-wrong results in the
+dose-response and epidemiology modules and a heterogeneity-statistic bug in
+meta-analysis, plus documentation corrections. Results now agree with the R
+references to their stated tolerances. It is a **major** release because one fix
+changes a public signature (see Breaking changes).
+
+### Breaking changes
+
+- **`epi.rate_standardize(method="indirect")` now requires a `standard_weights`
+  argument** (the standard population's stratum sizes) to compute the standardized
+  rate, and raises `ValidationError` without it. Previously the standardized rate
+  was silently wrong (it collapsed to the crude study rate); computing it correctly
+  needs the standard population's age distribution, which the old signature did not
+  carry. The SIR (the primary indirect output) is unaffected. Direct
+  standardization is unchanged.
+
+### Fixed
+
+- **`doseresponse.ec50()` now returns the true EC50/ED50 for asymmetric models.**
+  It previously returned the model's raw `e` location parameter, which is the
+  half-maximal dose only for the symmetric LL.4 model; for LL.5/W1.4/W2.4/BC.5 it
+  was off by 9–27% (e.g. LL.5 on `drc::ryegrass`: 2.21 vs the correct 3.02).
+  `ec50()` now solves the fitted curve for the dose at the half-maximal response,
+  matching `drc::ED(type="relative")` to <2e-5, and its confidence-interval SE
+  comes from the delta method applied to the solved ED50 (matching
+  `drc::ED(interval="delta")`). LL.4 is unchanged (ED50 == e).
+  (`pystatsbio/doseresponse/_potency.py`)
+- **`doseresponse.fit_drm(model="W2.4")` no longer converges to an inferior local
+  optimum on decreasing data.** The data-driven self-start seeded the wrong basin,
+  silently returning a ~14%-worse RSS with swapped asymptotes (RSS 6.02 vs drc's
+  5.29 on `ryegrass`). An auto-start W2.4 fit now also tries the mirror start and
+  keeps the lower-RSS result, recovering the natural-label global optimum.
+  Multistart never worsens a fit. (`pystatsbio/doseresponse/_fit.py`)
+- **`epi.epi_2by2` population attributable fraction now uses the exposure
+  prevalence.** Levin's PAF was computed with the disease prevalence `(a+c)/n`
+  instead of the exposure prevalence `(a+b)/n`, giving a value matching no
+  standard estimand (e.g. 0.286 instead of the correct 0.500 on a table with
+  RR=3 and 50% exposed). (`pystatsbio/epi/_measures.py`)
+- **`epi.rate_standardize(method="indirect")` now returns the correct
+  standardized rate.** The adjusted rate weighted the standard rates by the
+  *study* person-time, which algebraically collapsed it to the crude study rate.
+  It now takes a new **`standard_weights`** argument (the standard population's
+  stratum sizes, matching `epitools::ageadjust.indirect`'s `stdpop`) and returns
+  `SIR × standard-population crude rate`, matching epitools to ~1e-13. The
+  `indirect` method now requires `standard_weights` and fails loud without it
+  (the SIR itself is unaffected). (`pystatsbio/epi/_standardize.py`)
+- **`meta.rma` now reports estimator-specific I² and H².** They were computed
+  from Cochran's Q (the DerSimonian-Laird value) for every estimator, so
+  `method="REML"` (the default) and `method="PM"` reported DL's heterogeneity
+  statistics instead of their own (e.g. REML I² 92.65 instead of 92.07 on the
+  BCG dataset). I²/H² now come from each method's tau² via the "typical"
+  within-study variance, matching `metafor::rma`; DL is unchanged. Also,
+  `method="REML"`'s tau² standard error now uses the expected (Fisher)
+  information, matching `metafor` to ~1e-8. (`pystatsbio/meta/_random.py`)
+- **`pk.nca` terminal-slope (lambda_z) auto-selection now uses the WinNonlin/
+  NonCompart "Adjusted R-squared Best Fit" (ARS) rule.** It previously took the
+  strict argmax of the adjusted R², which on some profiles selects fewer terminal
+  points than the pharmacometrics standard (e.g. 3 vs 7 points on one
+  Theophylline subject, a ~4% half-life difference). It now chooses the window
+  with the most points whose adjusted R² is within 0.0001 of the maximum,
+  matching `NonCompart::sNCA` to machine precision across the Theophylline
+  dataset. (`pystatsbio/pk/_nca.py`)
+
+### Documentation
+
+These correct descriptions and references where the code was already correct and
+R-matching; no numeric behaviour changed.
+
+- `doseresponse.ec50()`: the confidence interval is a raw-scale symmetric Wald
+  interval (delta method), not a log-scale interval.
+- `diagnostic.roc()` AUC CI: described as a symmetric Wald interval on the AUC
+  scale (matching `pROC::ci.auc(method="delong")`), not "logit-transformed".
+- `power.power_crossover_be()`: documents that power uses the noncentral-t
+  approximation (PowerTOST `method="nct"`), which differs from PowerTOST's default
+  `exact` (Owen's Q) in power by up to ~1e-2 at low power/high CV; sample size is
+  unaffected.
+- README power R-reference table: corrected three entries that named R functions
+  which do not exist in the cited packages (`power_anova_factorial`,
+  `power_superiority_mean`, `power_cluster`) and re-pointed `power_fisher_test` and
+  `power_crossover_be` to the references they actually match.
+- `gee`: documents that `.scale`/`.alpha` use a degrees-of-freedom correction
+  (matching statsmodels; differs from geepack's uncorrected moments by <1-2%),
+  while coefficients and robust SE match geepack.
+- `epi.rate_standardize` (direct): clarified that the CI is a normal approximation
+  (the point estimate and variance match `epitools::ageadjust.direct`; the
+  Fay-Feuer gamma interval endpoints differ).
+
+
 ## 3.0.0
 
 ### Summary
