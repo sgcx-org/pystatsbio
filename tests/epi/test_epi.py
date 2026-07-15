@@ -251,39 +251,59 @@ class TestRateStandardizeIndirect:
 
     @pytest.fixture
     def example_data(self):
-        """Three strata with standard rates."""
+        """Three strata: study counts/person-time, standard rates, standard sizes.
+
+        Standard age distribution differs from the study person-time so the
+        standardized rate must differ from the crude rate.
+        """
         counts = np.array([15, 25, 60])
         person_time = np.array([1000, 2000, 5000])
         standard_rates = np.array([0.008, 0.012, 0.015])
-        return counts, person_time, standard_rates
+        standard_weights = np.array([5000, 3000, 2000])
+        return counts, person_time, standard_rates, standard_weights
+
+    def _call(self, example_data):
+        counts, pt, rates, weights = example_data
+        return rate_standardize(counts, pt, rates, method="indirect",
+                                standard_weights=weights)
 
     def test_returns_standardized_rate(self, example_data):
-        result = rate_standardize(*example_data, method="indirect")
-        assert isinstance(result, StandardizedRateSolution)
+        assert isinstance(self._call(example_data), StandardizedRateSolution)
 
     def test_method_is_indirect(self, example_data):
-        result = rate_standardize(*example_data, method="indirect")
-        assert result.method == "indirect"
+        assert self._call(example_data).method == "indirect"
 
     def test_sir_computed(self, example_data):
-        """Indirect method should produce SIR."""
-        result = rate_standardize(*example_data, method="indirect")
-        assert result.sir is not None
-        assert result.sir_ci is not None
+        result = self._call(example_data)
+        assert result.sir is not None and result.sir_ci is not None
         assert result.sir > 0
 
     def test_sir_value(self, example_data):
         """SIR = observed / expected."""
-        counts, person_time, standard_rates = example_data
-        observed = np.sum(counts)  # 100
-        expected = np.sum(standard_rates * person_time)
-        # expected = 0.008*1000 + 0.012*2000 + 0.015*5000 = 8 + 24 + 75 = 107
-        result = rate_standardize(*example_data, method="indirect")
-        assert result.sir == pytest.approx(observed / expected, rel=1e-6)
+        counts, pt, rates, _ = example_data
+        observed = np.sum(counts)
+        expected = np.sum(rates * pt)  # 8 + 24 + 75 = 107
+        assert self._call(example_data).sir == pytest.approx(observed / expected, rel=1e-6)
 
     def test_sir_ci_contains_sir(self, example_data):
-        result = rate_standardize(*example_data, method="indirect")
+        result = self._call(example_data)
         assert result.sir_ci[0] <= result.sir <= result.sir_ci[1]
+
+    def test_standardized_rate_is_sir_times_standard_crude_rate(self, example_data):
+        """Regression: standardized rate = SIR * standard-population crude rate,
+        NOT the study crude rate (the 3.0.0 collapse bug)."""
+        counts, pt, rates, weights = example_data
+        result = self._call(example_data)
+        std_crude = np.sum(rates * weights) / np.sum(weights)
+        assert result.adjusted_rate == pytest.approx(result.sir * std_crude, rel=1e-10)
+        # must NOT equal the study crude rate
+        assert abs(result.adjusted_rate - result.crude_rate) / result.crude_rate > 0.05
+
+    def test_missing_standard_weights_raises(self, example_data):
+        """Indirect without standard_weights fails loud (no silent crude-rate collapse)."""
+        counts, pt, rates, _ = example_data
+        with pytest.raises(ValueError, match="standard_weights"):
+            rate_standardize(counts, pt, rates, method="indirect")
 
 
 class TestRateStandardizeValidation:
@@ -300,6 +320,22 @@ class TestRateStandardizeValidation:
     def test_negative_counts_raise(self):
         with pytest.raises(ValueError, match="non-negative"):
             rate_standardize([-1, 10], [1000, 2000], [5000, 5000])
+
+
+class TestPopAttributableFractionRegression:
+    """Levin's PAF must use exposure prevalence (a+b)/n, not disease prevalence."""
+
+    def test_paf_uses_exposure_prevalence(self):
+        # Table [[a,b],[c,d]] = exposed/unexposed x case/control.
+        # a=30,b=70,c=10,d=90 -> RR=3, exposure prev (a+b)/n = 0.5, disease prev
+        # (a+c)/n = 0.2. Correct Levin PAF with exposure prev = 0.5.
+        result = epi_2by2(np.array([[30, 70], [10, 90]]))
+        rr = 3.0
+        pe_exposure = (30 + 70) / 200
+        expected = pe_exposure * (rr - 1) / (pe_exposure * (rr - 1) + 1)
+        assert result.population_attributable_fraction.estimate == pytest.approx(expected)
+        # the disease-prevalence value (the 3.0.0 bug) was 0.2857 — must NOT match
+        assert abs(result.population_attributable_fraction.estimate - 0.2857) > 0.1
 
     def test_zero_person_time_raises(self):
         with pytest.raises(ValueError, match="positive"):

@@ -1,8 +1,16 @@
 """EC50/IC50 estimation and relative potency analysis.
 
-EC50 confidence intervals via the delta method on the log scale.
-Relative potency (ratio of EC50s from two independent fits) uses
-Fieller's theorem.
+The EC50 (ED50) is the dose producing a response half-way between the fitted
+lower and upper asymptotes. It is obtained by solving the fitted curve for that
+half-maximal response — which equals the model's ``e`` location parameter only
+for the symmetric LL.4 model, and differs from ``e`` for the asymmetric models
+(LL.5, W1.4, W2.4, BC.5), matching R ``drc::ED(type="relative")``. The
+confidence interval is a raw-scale symmetric Wald interval (estimate ± t·SE)
+where SE comes from the delta method applied to the solved ED50, matching R
+``drc::ED(interval="delta")``.
+
+Relative potency (ratio of EC50s from two independent fits) uses Fieller's
+theorem.
 
 Validates against: R drc::ED(), drc::EDcomp()
 """
@@ -14,11 +22,11 @@ from dataclasses import dataclass
 import numpy as np
 from pystatistics.core.exceptions import ValidationError
 from pystatistics.core.result import Result, SolutionReprMixin
+from scipy.optimize import brentq
 from scipy.stats import norm
 from scipy.stats import t as t_dist
 
-from pystatsbio.doseresponse._common import DoseResponseSolution
-from pystatsbio.doseresponse._models import _MODEL_MAP
+from pystatsbio.doseresponse._common import CurveParams, DoseResponseSolution
 
 
 @dataclass(frozen=True)
@@ -168,18 +176,84 @@ class RelativePotencySolution(SolutionReprMixin):
 # Public API
 # ---------------------------------------------------------------------------
 
+def _solve_ed50(curve: CurveParams, e_hint: float) -> float:
+    """Dose at the half-maximal response (bottom+top)/2 for a fitted curve.
+
+    Solves ``predict(x) = (bottom+top)/2`` for x on the descending/ascending
+    branch. Equals the model's ``e`` parameter for the symmetric LL.4 and
+    differs for the asymmetric models — matching ``drc::ED(type="relative")``.
+    For non-monotone curves (BC.5 hormesis) the highest-dose crossing (the
+    descending branch) is taken. Returns NaN if no crossing is found.
+    """
+    target = 0.5 * (curve.bottom + curve.top)
+
+    def f(log_x: float) -> float:
+        return float(curve.predict(np.array([np.exp(log_x)]))[0]) - target
+
+    if not (np.isfinite(e_hint) and e_hint > 0):
+        return float("nan")
+    grid = np.log(e_hint) + np.linspace(-12.0, 12.0, 400)
+    vals = np.array([f(lx) for lx in grid])
+    finite = np.isfinite(vals)
+    changes = np.where(np.diff(np.sign(vals)) != 0)[0]
+    # keep only sign changes with finite endpoints; take the highest-dose one
+    changes = [i for i in changes if finite[i] and finite[i + 1]]
+    if not changes:
+        return float("nan")
+    i = changes[-1]
+    try:
+        return float(np.exp(brentq(f, grid[i], grid[i + 1])))
+    except (ValueError, RuntimeError):
+        return float("nan")
+
+
+def _ed50_delta_se(fit_result: DoseResponseSolution, ed50: float) -> float:
+    """Delta-method SE of the solved ED50, matching drc::ED(interval="delta").
+
+    Uses the fit's parameter covariance (observed information, the same matrix
+    drc uses) and the gradient of ED50 with respect to the parameters (finite
+    differences, re-solving ED50 at each perturbation).
+    """
+    model = fit_result.model
+    theta = fit_result.params.to_array()
+    n_p = len(theta)
+    n_obs = fit_result.n_obs
+    if n_obs <= n_p or not (np.isfinite(ed50) and ed50 > 0):
+        return float("nan")
+
+    cov = fit_result.cov
+    if cov is None or not np.all(np.isfinite(cov)):
+        return float("nan")
+
+    grad = np.zeros(n_p)
+    for i in range(n_p):
+        eps = max(1e-6, abs(theta[i]) * 1e-6)
+        tp = theta.copy()
+        tp[i] += eps
+        ed_p = _solve_ed50(CurveParams.from_array(tp, model), fit_result.params.ec50)
+        if not np.isfinite(ed_p):
+            return float("nan")
+        grad[i] = (ed_p - ed50) / eps
+
+    var = float(grad @ cov @ grad)
+    return float(np.sqrt(var)) if var >= 0 else float("nan")
+
+
 def ec50(
     fit_result: DoseResponseSolution,
     *,
     conf_level: float = 0.95,
     method: str = "delta",
 ) -> EC50Solution:
-    """Extract EC50 with confidence interval from a fitted model.
+    """Extract the EC50 (ED50) with confidence interval from a fitted model.
 
-    For models where EC50 is a direct parameter (LL.4, LL.5, W1.4, W2.4,
-    BC.5), the standard error comes from the parameter covariance matrix.
-    The confidence interval is constructed on the log scale (since EC50 is
-    positive) and back-transformed.
+    The EC50 is the dose producing a response half-way between the fitted lower
+    and upper asymptotes, obtained by solving the fitted curve — matching R
+    ``drc::ED(type="relative")``. This equals the model's ``e`` location
+    parameter for the symmetric LL.4 and differs for the asymmetric models
+    (LL.5, W1.4, W2.4, BC.5). The confidence interval is a raw-scale symmetric
+    Wald interval (estimate ± t·SE) with the SE from the delta method applied to
+    the solved ED50, matching ``drc::ED(interval="delta")``.
 
     Parameters
     ----------
@@ -201,13 +275,10 @@ def ec50(
     if method != "delta":
         raise ValidationError(f"method must be 'delta', got {method!r}")
 
-    _, param_names = _MODEL_MAP[fit_result.model]
-    ec50_idx = param_names.index("ec50")
-    ec50_val = fit_result.params.ec50
-    se_ec50 = float(fit_result.se[ec50_idx])
+    ec50_val = _solve_ed50(fit_result.params, fit_result.params.ec50)
+    se_ec50 = _ed50_delta_se(fit_result, ec50_val)
 
-    # Use t-distribution with residual df on the raw scale,
-    # matching R drc::ED(interval="delta")
+    # t-distribution with residual df on the raw scale (drc::ED delta convention)
     n_params = len(fit_result.se)
     df_resid = fit_result.n_obs - n_params
     if df_resid > 0:
@@ -246,10 +317,21 @@ def relative_potency(
     *,
     conf_level: float = 0.95,
 ) -> RelativePotencySolution:
-    """Relative potency: ratio of EC50s between two curves with Fieller's CI.
+    """Relative potency: ratio of EC50s (ED50s) between two curves, Fieller's CI.
 
-    Computes ``rho = EC50_2 / EC50_1`` with a confidence interval based on
+    Computes ``rho = ED50_2 / ED50_1`` with a confidence interval based on
     Fieller's theorem for the ratio of two independent estimates.
+
+    Both ED50s are obtained by solving each fitted curve for its half-maximal
+    response (the same quantity :func:`ec50` returns), *not* by ratioing the raw
+    ``e`` location parameters. For the symmetric LL.4 — and for any two *parallel*
+    curves, where the ``e``-to-ED50 factor is identical and cancels — the two are
+    the same. They differ for non-parallel asymmetric fits (LL.5/W1.4/W2.4/BC.5),
+    where ratioing ``e`` would not be the potency ratio at all.
+
+    Note this function does **not** test parallelism; relative potency is only
+    meaningful for curves of the same shape, and assessing that is the caller's
+    responsibility.
 
     Parameters
     ----------
@@ -269,12 +351,12 @@ def relative_potency(
     if not (0.0 < conf_level < 1.0):
         raise ValidationError(f"conf_level must be in (0, 1), got {conf_level}")
 
-    _, names1 = _MODEL_MAP[fit1.model]
-    _, names2 = _MODEL_MAP[fit2.model]
-    e1 = fit1.params.ec50
-    e2 = fit2.params.ec50
-    se1 = float(fit1.se[names1.index("ec50")])
-    se2 = float(fit2.se[names2.index("ec50")])
+    # Solved ED50s (half-maximal doses), consistent with ec50(), plus their
+    # delta-method SEs — NOT the raw `e` parameters.
+    e1 = _solve_ed50(fit1.params, fit1.params.ec50)
+    e2 = _solve_ed50(fit2.params, fit2.params.ec50)
+    se1 = _ed50_delta_se(fit1, e1)
+    se2 = _ed50_delta_se(fit2, e2)
 
     ratio = e2 / e1 if e1 != 0 else float("nan")
 

@@ -22,6 +22,45 @@ Each function states exactly which R function it replicates and to what toleranc
 
 ---
 
+## What's New in 4.0
+
+Version 4.0 is a correctness release from a full validation sweep of every module
+against its R reference (drc, PKNCA/NonCompart, pROC/epiR, pwr/PowerTOST, metafor,
+geepack). It fixes several results that were silently wrong and now agree with the
+R references to tight tolerances:
+
+- **`doseresponse.ec50()`** returns the true EC50/ED50 for the asymmetric models
+  (LL.5, W1.4, W2.4, BC.5), by solving the fitted curve for the half-maximal dose
+  rather than returning the raw location parameter (which was off by up to ~27%).
+- **`doseresponse.fit_drm(model="W2.4")`** no longer converges to an inferior local
+  optimum on decreasing data.
+- **`epi.epi_2by2`** population attributable fraction now uses the exposure
+  prevalence in Levin's formula.
+- **`meta.rma`** reports estimator-specific I²/H² (the default REML/PM previously
+  reported the DerSimonian-Laird value).
+- **`pk.nca`** terminal-slope selection uses the WinNonlin/NonCompart "best-fit"
+  rule, matching the reference tools.
+
+**Breaking change:** `epi.rate_standardize(method="indirect")` now requires a
+`standard_weights` argument (the standard population's age distribution) to compute
+the standardized rate — previously it was silently wrong. The SIR is unaffected.
+
+## What's New in 3.0
+
+Version 3.0 tracks the PyStatistics 5.0 API. **It requires `pystatistics>=5.0`**
+and will not run on 4.x. PyStatsBio's own statistical results are unchanged; the
+breaking change is the raised dependency floor plus one relayed value:
+
+- **GLM/GEE family names are lowercase.** Following PyStatistics 5.0's naming
+  cleanup, the Gamma family now reports `result.family_name == "gamma"` (was
+  `"Gamma"`), consistent with `"gaussian"`, `"binomial"`, and `"poisson"`. Code
+  that compared against the capitalized `"Gamma"` must switch to `"gamma"`.
+
+Everything introduced in 2.0 — the `…Solution` result objects, the descriptive
+power-analysis parameters, the hyphenated option values, and the
+`ValidationError` / `ConvergenceError` / `NumericalError` taxonomy — is
+unchanged.
+
 ## What's New in 2.0
 
 Version 2.0 is a consistency release that aligns the whole library with the
@@ -238,16 +277,16 @@ print(result.summary())
 | `power_t_test()` | `pwr::pwr.t.test()` |
 | `power_paired_t_test()` | `pwr::pwr.t.test(type="paired")` |
 | `power_prop_test()` | `pwr::pwr.2p.test()` |
-| `power_fisher_test()` | `TrialSize::TwoSampleProportion.Equality()` |
+| `power_fisher_test()` | `pwr::pwr.2p.test()` (via Cohen's h) |
 | `power_logrank()` | `gsDesign::nSurv()` |
 | `power_anova_oneway()` | `pwr::pwr.anova.test()` |
-| `power_anova_factorial()` | `TrialSize::FactorialDesign()` |
+| `power_anova_factorial()` | `pwr::pwr.f2.test()` |
 | `power_noninf_mean()` | `TrialSize::TwoSampleMean.NIS()` |
 | `power_noninf_prop()` | `TrialSize::TwoSampleProportion.NIS()` |
 | `power_equiv_mean()` | `TrialSize::TwoSampleMean.Equivalence()` |
-| `power_superiority_mean()` | `TrialSize::TwoSampleMean.Superiority()` |
-| `power_crossover_be()` | `PowerTOST::sampleSize()` |
-| `power_cluster()` | `samplesize::n.twogroup()` with ICC |
+| `power_superiority_mean()` | `TrialSize::TwoSampleMean.NIS()` |
+| `power_crossover_be()` | `PowerTOST::sampleN.TOST()`, `power.TOST(method="nct")` |
+| `power_cluster()` | `clusterPower`, `CRTSize` (ICC-adjusted) |
 
 ### `doseresponse` — Dose-Response Modeling
 
@@ -256,11 +295,11 @@ print(result.summary())
 | `fit_drm()` | `drc::drm()` |
 | `fit_drm_batch()` | vectorized `drc::drm()` |
 | `ec50()` | `drc::ED()` |
-| `relative_potency()` | `drc::EDcomp()` with parallelism test |
+| `relative_potency()` | `drc::EDcomp()` (ratio of ED50s, Fieller CI) |
 | `bmd()` | `drc::bmd()` / `BMDS` |
 
 Models: `LL.4` (4PL), `LL.5` (5PL), `W1.4` (Weibull-1), `W2.4` (Weibull-2),
-`BC.4` (Brain-Cousens hormesis).
+`BC.5` (Brain-Cousens hormesis).
 
 ### `diagnostic` — Diagnostic Accuracy
 
@@ -302,7 +341,15 @@ Routes: `iv` (intravenous), `ev` (extravascular).
 
 | Function | R equivalent |
 |----------|--------------|
-| `gee()` | `geepack::geeglm()` |
+| `gee()` | `gee::gee()` / SAS `PROC GENMOD` (Liang-Zeger); `geepack::geeglm()` |
+
+The working-correlation parameters use the classical **Liang-Zeger (1986)**
+method-of-moments estimator — for AR(1), the lag-1 adjacent-pair moment, the same
+convention as `gee::gee(corstr="AR-M", Mv=1)` and **SAS PROC GENMOD**.
+`geepack::geeglm` instead uses the Yan & Fine (2004) all-lag estimating equation;
+both are consistent when AR(1) is correctly specified, but they differ when it is
+not. Coefficients and robust SE match `geepack` under independence and
+exchangeable.
 
 Families: `gaussian`, `binomial`, `poisson`.
 Correlation structures: `independence`, `exchangeable`, `ar1`, `unstructured`.

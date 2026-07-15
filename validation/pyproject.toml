@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pystatsbioval"
+version = "0.1.0"
+description = "pystatsbio validation harness core (not shipped in the pystatsbio wheel)"
+requires-python = ">=3.11"
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+gpu = ["torch"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["pystatsbioval"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

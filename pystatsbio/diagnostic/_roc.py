@@ -1,8 +1,9 @@
 """ROC curve analysis with DeLong confidence intervals and comparison test.
 
 Implements the empirical ROC curve, AUC via Mann-Whitney U, DeLong
-standard errors and CIs (logit-transformed), and the DeLong test for
-comparing two correlated ROC curves.
+standard errors and CIs (symmetric Wald on the AUC scale, clamped to
+[0, 1], matching R pROC::ci.auc(method="delong")), and the DeLong test
+for comparing two correlated ROC curves.
 
 References
 ----------

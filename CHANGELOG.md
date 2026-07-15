@@ -1,5 +1,229 @@
 # Changelog
 
+## 4.0.2
+
+### Summary
+
+4.0.2 fixes defects surfaced while assembling the formal validation evidence for
+4.0.1 — most importantly a silently-wrong relative potency for non-parallel
+asymmetric dose-response curves, and a silent failure in NCA. It also aligns the
+dose-response standard errors with R drc and implements the AUMC/MRT parameters
+the docstring already advertised.
+
+### Added
+
+- **`pk.nca()` now computes and exposes AUMC and MRT.** `.aumc_last` (area under
+  the first moment curve to the last measurable concentration), `.aumc_inf`
+  (extrapolated to infinity), and `.mrt` (mean residence time = AUMC_inf/AUC_inf)
+  are new `NCASolution` accessors — standard NCA parameters that the module
+  docstring listed but had never actually wired into the result. They match
+  `NonCompart::sNCA`'s AUMCLST/AUMCIFO/MRTEVIFO to ~1e-13.
+  (`pystatsbio/pk/_nca.py`, `pystatsbio/pk/_common.py`)
+- **`DoseResponseSolution` exposes the parameter covariance matrix** as `.cov`.
+
+### Changed
+
+- **Dose-response standard errors now use the observed-information covariance,
+  matching R drc.** `fit_drm` coefficient SEs, the `ec50()` delta-method SE, and
+  the `relative_potency()` Fieller interval previously used the Gauss-Newton
+  covariance `s²(JᵀJ)⁻¹`; they now use `s²(½H)⁻¹` (the inverse scaled RSS
+  Hessian), which is exactly what `drc::drm()`/`drc::ED()` report. The two are
+  asymptotically equivalent but differed by up to ~11% on the Hill-slope SE for
+  the log-logistic family (and ~1% on the EC50 CI width); coefficient SEs now
+  agree with drc's `summary()` to <1% and the EC50 SE to <4e-4. This is a small
+  user-visible change to the reported uncertainties (the point estimates are
+  unchanged). (`pystatsbio/doseresponse/_fit.py`, `_potency.py`)
+
+### Fixed
+
+- **`doseresponse.relative_potency()` now ratios the solved ED50s, not the raw `e`
+  parameters.** It previously divided the two fits' `e` location parameters. For
+  the symmetric LL.4 — and for any two *parallel* curves, where the `e`-to-ED50
+  factor is identical and cancels — that is the same number. For **non-parallel
+  asymmetric** fits (LL.5/W1.4/W2.4/BC.5) it is not the potency ratio at all: on a
+  non-parallel LL.5 pair it returned 1.70 where the true ED50 ratio is 0.40 — the
+  wrong magnitude *and* the wrong direction. It now uses the same solved ED50 (and
+  its delta-method SE) that `ec50()` returns, so it is correct regardless of
+  parallelism. Parallel-curve results are unchanged.
+  (`pystatsbio/doseresponse/_potency.py`)
+- **`pk.nca()` no longer fails silently when the terminal phase cannot be fitted.**
+  The `LambdaZEstimationError` was suppressed, returning `lambda_z` — and every
+  parameter derived from it (`half_life`, `auc_inf`, `auc_pct_extrap`, `clearance`,
+  `vz`) — as `None` with an **empty** `.warnings` tuple and no other signal. The
+  reason is now reported in `.warnings`. The degenerate all-zero-concentration
+  profile warns too. (`pystatsbio/pk/_nca.py`)
+
+### Documentation
+
+- `pk`: the module docstring claimed **AUMC and MRT** among the computed
+  parameters; neither is computed or exposed by `nca()` (the moment-curve helpers
+  are not wired into the result). The claim is removed and the omission stated.
+- `pk`: "Validates against PKNCA" removed — PKNCA uses a different default
+  terminal-slope selection and is not a validated reference for this module. The
+  validated reference is `NonCompart::sNCA()`.
+- README: `relative_potency()` was listed as `drc::EDcomp()` **"with parallelism
+  test"** — no parallelism test is performed. The entry now states what the
+  function actually does (ratio of ED50s with a Fieller interval), and the
+  docstring notes that assessing parallelism is the caller's responsibility.
+
+
+## 4.0.1
+
+### Summary
+
+4.0.1 corrects the documented reference for the `gee` working-correlation
+estimator. No numeric behaviour changes.
+
+### Documentation
+
+- **`gee` now states its correlation estimator and cites the right reference.**
+  The working-correlation parameters use the classical **Liang-Zeger (1986)**
+  method of moments — for AR(1), the lag-1 adjacent-pair Pearson-residual moment,
+  the same convention as R `gee::gee(corstr="AR-M", Mv=1)` and **SAS PROC
+  GENMOD**. The docs previously cited only `geepack::geeglm()`, which uses the
+  Yan & Fine (2004) *all-lag* estimating equation for the AR(1) correlation and so
+  is **not** the matching reference for that structure. Both estimators are
+  consistent when AR(1) is correctly specified (both recover the true alpha), but
+  they converge to different limits when AR(1) is misspecified — pystatsbio/SAS to
+  the true lag-1 correlation, geepack to an all-lag compromise. Coefficients and
+  robust SE still match `geepack` under independence and exchangeable.
+  (`pystatsbio/gee/__init__.py`, `README.md`)
+
+
+## 4.0.0
+
+### Summary
+
+4.0.0 is a correctness bundle from the first full validation sweep of every
+subsystem against its R reference (drc, PKNCA/NonCompart, pROC/epiR, pwr/PowerTOST,
+epiR/epitools, metafor, geepack). It fixes several silently-wrong results in the
+dose-response and epidemiology modules and a heterogeneity-statistic bug in
+meta-analysis, plus documentation corrections. Results now agree with the R
+references to their stated tolerances. It is a **major** release because one fix
+changes a public signature (see Breaking changes).
+
+### Breaking changes
+
+- **`epi.rate_standardize(method="indirect")` now requires a `standard_weights`
+  argument** (the standard population's stratum sizes) to compute the standardized
+  rate, and raises `ValidationError` without it. Previously the standardized rate
+  was silently wrong (it collapsed to the crude study rate); computing it correctly
+  needs the standard population's age distribution, which the old signature did not
+  carry. The SIR (the primary indirect output) is unaffected. Direct
+  standardization is unchanged.
+
+### Fixed
+
+- **`doseresponse.ec50()` now returns the true EC50/ED50 for asymmetric models.**
+  It previously returned the model's raw `e` location parameter, which is the
+  half-maximal dose only for the symmetric LL.4 model; for LL.5/W1.4/W2.4/BC.5 it
+  was off by 9–27% (e.g. LL.5 on `drc::ryegrass`: 2.21 vs the correct 3.02).
+  `ec50()` now solves the fitted curve for the dose at the half-maximal response,
+  matching `drc::ED(type="relative")` to <2e-5, and its confidence-interval SE
+  comes from the delta method applied to the solved ED50 (matching
+  `drc::ED(interval="delta")`). LL.4 is unchanged (ED50 == e).
+  (`pystatsbio/doseresponse/_potency.py`)
+- **`doseresponse.fit_drm(model="W2.4")` no longer converges to an inferior local
+  optimum on decreasing data.** The data-driven self-start seeded the wrong basin,
+  silently returning a ~14%-worse RSS with swapped asymptotes (RSS 6.02 vs drc's
+  5.29 on `ryegrass`). An auto-start W2.4 fit now also tries the mirror start and
+  keeps the lower-RSS result, recovering the natural-label global optimum.
+  Multistart never worsens a fit. (`pystatsbio/doseresponse/_fit.py`)
+- **`epi.epi_2by2` population attributable fraction now uses the exposure
+  prevalence.** Levin's PAF was computed with the disease prevalence `(a+c)/n`
+  instead of the exposure prevalence `(a+b)/n`, giving a value matching no
+  standard estimand (e.g. 0.286 instead of the correct 0.500 on a table with
+  RR=3 and 50% exposed). (`pystatsbio/epi/_measures.py`)
+- **`epi.rate_standardize(method="indirect")` now returns the correct
+  standardized rate.** The adjusted rate weighted the standard rates by the
+  *study* person-time, which algebraically collapsed it to the crude study rate.
+  It now takes a new **`standard_weights`** argument (the standard population's
+  stratum sizes, matching `epitools::ageadjust.indirect`'s `stdpop`) and returns
+  `SIR × standard-population crude rate`, matching epitools to ~1e-13. The
+  `indirect` method now requires `standard_weights` and fails loud without it
+  (the SIR itself is unaffected). (`pystatsbio/epi/_standardize.py`)
+- **`meta.rma` now reports estimator-specific I² and H².** They were computed
+  from Cochran's Q (the DerSimonian-Laird value) for every estimator, so
+  `method="REML"` (the default) and `method="PM"` reported DL's heterogeneity
+  statistics instead of their own (e.g. REML I² 92.65 instead of 92.07 on the
+  BCG dataset). I²/H² now come from each method's tau² via the "typical"
+  within-study variance, matching `metafor::rma`; DL is unchanged. Also,
+  `method="REML"`'s tau² standard error now uses the expected (Fisher)
+  information, matching `metafor` to ~1e-8. (`pystatsbio/meta/_random.py`)
+- **`pk.nca` terminal-slope (lambda_z) auto-selection now uses the WinNonlin/
+  NonCompart "Adjusted R-squared Best Fit" (ARS) rule.** It previously took the
+  strict argmax of the adjusted R², which on some profiles selects fewer terminal
+  points than the pharmacometrics standard (e.g. 3 vs 7 points on one
+  Theophylline subject, a ~4% half-life difference). It now chooses the window
+  with the most points whose adjusted R² is within 0.0001 of the maximum,
+  matching `NonCompart::sNCA` to machine precision across the Theophylline
+  dataset. (`pystatsbio/pk/_nca.py`)
+
+### Documentation
+
+These correct descriptions and references where the code was already correct and
+R-matching; no numeric behaviour changed.
+
+- `doseresponse.ec50()`: the confidence interval is a raw-scale symmetric Wald
+  interval (delta method), not a log-scale interval.
+- `diagnostic.roc()` AUC CI: described as a symmetric Wald interval on the AUC
+  scale (matching `pROC::ci.auc(method="delong")`), not "logit-transformed".
+- `power.power_crossover_be()`: documents that power uses the noncentral-t
+  approximation (PowerTOST `method="nct"`), which differs from PowerTOST's default
+  `exact` (Owen's Q) in power by up to ~1e-2 at low power/high CV; sample size is
+  unaffected.
+- README power R-reference table: corrected three entries that named R functions
+  which do not exist in the cited packages (`power_anova_factorial`,
+  `power_superiority_mean`, `power_cluster`) and re-pointed `power_fisher_test` and
+  `power_crossover_be` to the references they actually match.
+- `gee`: documents that `.scale`/`.alpha` use a degrees-of-freedom correction
+  (matching statsmodels; differs from geepack's uncorrected moments by <1-2%),
+  while coefficients and robust SE match geepack.
+- `epi.rate_standardize` (direct): clarified that the CI is a normal approximation
+  (the point estimate and variance match `epitools::ageadjust.direct`; the
+  Fay-Feuer gamma interval endpoints differ).
+
+
+## 3.0.0
+
+### Summary
+
+3.0 tracks the PyStatistics 5.0 API. PyStatsBio's statistical results are
+unchanged; this is a breaking release because the required PyStatistics floor
+moves to 5.0 (the 4.x API it was built against is gone) and one relayed value
+changes.
+
+### Changed
+
+- **Requires `pystatistics>=5.0`** (was `>=4.0`). PyStatistics 5.0 hard-renamed
+  ~40 public names and removed the 4.x surface with no shim, so PyStatsBio
+  cannot run on 4.x. PyStatsBio's own source needed no code changes: its only
+  coupling to PyStatistics is through internal infrastructure
+  (`core.exceptions`, `core.result`, `core.compute.{backend,device,tolerances}`,
+  `regression.families`), all of which 5.0 left stable. Verified by running the
+  full test suite against `pystatistics==5.0.0` from PyPI. (`pyproject.toml`)
+- **GLM/GEE family names are lowercase.** `gee(..., family="gamma").family_name`
+  now returns `"gamma"` instead of `"Gamma"`, matching the sibling families
+  (`"gaussian"`, `"binomial"`, `"poisson"`). The value is relayed straight from
+  PyStatistics' `Family.name`, which 5.0 changed for naming consistency
+  (`GammaFamily`→`Gamma`, `.name` `'Gamma'`→`'gamma'`); PyStatsBio's GEE code
+  (`gee/__init__.py`) was already correct and needed no change. Updated the one
+  stale test assertion in `tests/gee/test_gee.py`
+  (`TestBasicFitting::test_gamma_family`).
+
+### Fixed
+
+- **README dose-response model identifier corrected**: the `doseresponse`
+  models list advertised `BC.4` for the Brain-Cousens hormesis model, but
+  `fit_drm`/`fit_drm_batch` only accept `BC.5` (the shipped model is the
+  5-parameter Brain-Cousens). Following the README verbatim raised a
+  `ValidationError`. The README now lists `BC.5`; the code is unchanged.
+- `docs/conf.py` `version`/`release` were stuck at `0.1.0` (never tracked the
+  package version); set to `3.0.0`.
+- `pystatsbio/CONVENTIONS.md` §0 now cites the pystatistics **5.0** constitution
+  and its amendments **A1–A14** (was "4.0" / "A1–A5").
+
+
 ## 2.0.0 — the consistency release
 
 A library-wide pass that aligns PyStatsBio with the PyStatistics 4.0 API

@@ -79,6 +79,7 @@ class DoseResponseParams:
 
     curve: CurveParams
     se: NDArray[np.floating]  # standard errors of parameters
+    cov: NDArray[np.floating]  # parameter covariance (n_params, n_params)
     residuals: NDArray[np.floating]
     rss: float
     aic: float
@@ -132,6 +133,11 @@ class DoseResponseSolution(SolutionReprMixin):
     @property
     def se(self) -> NDArray[np.floating]:
         return self._result.params.se
+
+    @property
+    def cov(self) -> NDArray[np.floating]:
+        """Parameter covariance matrix (observed information, matching drc)."""
+        return self._result.params.cov
 
     @property
     def residuals(self) -> NDArray[np.floating]:

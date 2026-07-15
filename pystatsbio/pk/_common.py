@@ -31,6 +31,9 @@ class NCAParams:
     # Derived parameters (require dose)
     clearance: float | None  # CL = Dose / AUC_inf (or CL/F for oral)
     vz: float | None  # Vz = Dose / (lambda_z * AUC_inf)
+    aumc_last: float  # AUMC (first moment) from 0 to last measurable concentration
+    aumc_inf: float | None  # AUMC extrapolated to infinity
+    mrt: float | None  # mean residence time = AUMC_inf / AUC_inf
 
     # Metadata
     dose: float | None
@@ -108,6 +111,21 @@ class NCASolution(SolutionReprMixin):
     @property
     def vz(self) -> float | None:
         return self._result.params.vz
+
+    @property
+    def aumc_last(self) -> float:
+        """Area under the first moment curve to the last measurable concentration."""
+        return self._result.params.aumc_last
+
+    @property
+    def aumc_inf(self) -> float | None:
+        """AUMC extrapolated to infinity (None if lambda_z is not estimable)."""
+        return self._result.params.aumc_inf
+
+    @property
+    def mrt(self) -> float | None:
+        """Mean residence time = AUMC_inf / AUC_inf (None if lambda_z unavailable)."""
+        return self._result.params.mrt
 
     @property
     def dose(self) -> float | None:

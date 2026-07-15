@@ -6,7 +6,14 @@ Implements three tau2 estimators for between-study variance:
 - Paule-Mandel (PM): iterative generalized Q-statistic
 
 After tau2 estimation, all methods compute the pooled estimate using
-inverse-variance weights w_i* = 1 / (v_i + tau2).
+inverse-variance weights w_i* = 1 / (v_i + tau2). I2 and H2 are estimator-specific
+(derived from each method's own tau2, matching metafor), not the Q-based value.
+
+The standard error of tau2 is reported for the likelihood-based **REML** estimator
+(from the expected/Fisher information). It is deliberately **not** reported for the
+moment-based DerSimonian-Laird and Paule-Mandel estimators (``tau2_se`` is None):
+their tau2 SEs are non-standard, estimator-specific large-sample quantities — use
+``method="REML"`` if a principled SE of tau2 is needed.
 
 Validates against: R metafor::rma(method="DL"|"REML"|"PM")
 """
@@ -20,7 +27,7 @@ from pystatistics.core.result import Result
 from scipy import optimize, stats
 
 from pystatsbio.meta._common import MetaParams, MetaSolution
-from pystatsbio.meta._heterogeneity import cochran_q, h_squared, i_squared
+from pystatsbio.meta._heterogeneity import cochran_q
 
 
 def _pool_random(
@@ -66,9 +73,19 @@ def _pool_random(
     z_value = estimate / se
     p_value = float(2.0 * stats.norm.sf(abs(z_value)))
 
+    # Cochran's Q (heterogeneity test) is estimator-independent (fixed-effect
+    # weights) and reported as-is.
     Q, Q_df, Q_p = cochran_q(yi, vi)
-    I2 = i_squared(Q, k)
-    H2 = h_squared(Q, k)
+
+    # I2 / H2 are estimator-specific: metafor derives them from THIS method's tau2
+    # via the "typical" within-study variance s2, not from Q. For DerSimonian-Laird
+    # this reduces exactly to the Q-based forms (s2 = (k-1)/c), so DL is unchanged;
+    # for REML/PM it gives the estimator's own I2/H2 (the Q-based value was wrong).
+    wi_fe = 1.0 / vi
+    sum_wi_fe = np.sum(wi_fe)
+    s2 = float((k - 1) * sum_wi_fe / (sum_wi_fe**2 - np.sum(wi_fe**2)))
+    I2 = float(100.0 * tau2 / (tau2 + s2)) if (tau2 + s2) > 0 else 0.0
+    H2 = float((tau2 + s2) / s2)
     tau = float(np.sqrt(tau2))
 
     params = MetaParams(
@@ -178,49 +195,37 @@ def _reml_nll(tau2: float, yi: NDArray, vi: NDArray) -> float:
 
 
 def _reml_tau2_se(tau2: float, yi: NDArray, vi: NDArray) -> float:
-    """Standard error of tau2 from observed Fisher information.
+    """Standard error of tau2 from the REML *expected* (Fisher) information.
 
-    The second derivative of the restricted log-likelihood with respect
-    to tau2 is:
-        d2l/d(tau2)^2 = 0.5 * [sum(w_i^2) - 2*sum(w_i^3*(y_i-mu)^2)
-                                + (sum(w_i^2)/sum(w_i))^2
-                                - sum(w_i^2)^2/sum(w_i)]
-    where w_i = 1/(v_i + tau2).
-
-    We compute it numerically via central differences for robustness.
+    The expected information for tau2 under REML is
+        I(tau2) = 0.5 * [ S2 - 2*S3/S1 + (S2/S1)^2 ]
+    with w_i = 1/(v_i + tau2), S1 = sum(w_i), S2 = sum(w_i^2), S3 = sum(w_i^3);
+    se(tau2) = 1/sqrt(I). This is the expected-information SE that
+    ``metafor::rma(method="REML")`` reports (matching it to ~1e-7), rather than
+    the observed-information numerical second derivative used previously.
 
     Parameters
     ----------
     tau2 : float
         REML estimate of between-study variance.
     yi : NDArray
-        Effect sizes.
+        Effect sizes (unused; kept for signature symmetry — the expected
+        information does not depend on the observed y_i).
     vi : NDArray
         Sampling variances.
 
     Returns
     -------
     float
-        Standard error of tau2, or NaN if information matrix is non-positive.
+        Standard error of tau2, or NaN if the information is non-positive.
     """
-    h = max(1e-6, tau2 * 1e-4)
-    f0 = _reml_nll(tau2, yi, vi)
-    fp = _reml_nll(tau2 + h, yi, vi)
-    fm = _reml_nll(tau2 - h if tau2 - h > 0 else 0.0, yi, vi)
-    h_actual_left = tau2 - (tau2 - h if tau2 - h > 0 else 0.0)
-    h_actual_right = h
-
-    if abs(h_actual_left - h_actual_right) < 1e-12:
-        d2 = (fp - 2.0 * f0 + fm) / (h**2)
-    else:
-        d2 = 2.0 * (
-            fp / (h_actual_right * (h_actual_right + h_actual_left))
-            - f0 / (h_actual_right * h_actual_left)
-            + fm / (h_actual_left * (h_actual_right + h_actual_left))
-        )
-
-    if d2 > 0:
-        return float(1.0 / np.sqrt(d2))
+    w = 1.0 / (vi + tau2)
+    s1 = float(np.sum(w))
+    s2 = float(np.sum(w**2))
+    s3 = float(np.sum(w**3))
+    info = 0.5 * (s2 - 2.0 * s3 / s1 + (s2 / s1) ** 2)
+    if info > 0:
+        return float(1.0 / np.sqrt(info))
     return float("nan")
 
 

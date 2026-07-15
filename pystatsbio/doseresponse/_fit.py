@@ -11,6 +11,8 @@ Validates against: R drc::drm()
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ValidationError
@@ -155,36 +157,79 @@ def _initial_params(
 # Standard error computation
 # ---------------------------------------------------------------------------
 
-def _compute_se(
+def _rss_hessian(
+    rss_fn: Callable[[NDArray], float],
+    popt: NDArray,
+    rel_step: float = 1e-4,
+) -> NDArray[np.floating]:
+    """Numerical Hessian of the RSS objective at ``popt`` (central differences).
+
+    Second-derivative central differences have error O(h^2) + O(eps_machine/h^2),
+    so the step is taken relative to each parameter's own scale.
+    """
+    p = len(popt)
+    h = rel_step * np.maximum(np.abs(popt), 1.0)
+    H = np.empty((p, p), dtype=np.float64)
+    for j in range(p):
+        for k in range(j, p):
+            ej = np.zeros(p); ej[j] = h[j]
+            ek = np.zeros(p); ek[k] = h[k]
+            val = (
+                rss_fn(popt + ej + ek)
+                - rss_fn(popt + ej - ek)
+                - rss_fn(popt - ej + ek)
+                + rss_fn(popt - ej - ek)
+            ) / (4.0 * h[j] * h[k])
+            H[j, k] = H[k, j] = val
+    return H
+
+
+def _compute_cov_se(
+    rss_fn: Callable[[NDArray], float],
+    popt: NDArray,
     jac: NDArray,
     rss: float,
     n_obs: int,
     n_params: int,
-) -> NDArray[np.floating]:
-    """Standard errors from Jacobian: ``se = sqrt(diag((J'J)^{-1} * s²))``.
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Parameter covariance and standard errors from the OBSERVED information.
 
-    Parameters
-    ----------
-    jac : (n_obs, n_params)
-        Jacobian of the residual vector at the solution.
-    rss : float
-        Residual sum of squares.
-    n_obs, n_params : int
-        Number of observations and parameters.
+    The covariance is ``cov = s2 * (H/2)^-1 = 2*s2*H^-1`` where ``H`` is the
+    Hessian of the residual sum of squares and ``s2 = RSS/(n-p)``. Equivalently
+    ``(J'J + sum_i r_i * d2r_i)^-1 * s2`` — i.e. Gauss-Newton PLUS the
+    second-order curvature term.
+
+    This is what R ``drc::drm()`` reports (its ``vcCont`` inverts the scaled RSS
+    Hessian), and it is the reference this module validates against. The
+    Gauss-Newton approximation ``s2*(J'J)^-1`` drops the curvature term; both are
+    asymptotically valid, but on a curved model they differ materially along
+    poorly-conditioned directions (up to ~11% on the Hill slope for the log-logistic
+    family), so we match the reference rather than the cheaper approximation.
+
+    Falls back to Gauss-Newton if the Hessian is singular or not usable.
     """
     if n_obs <= n_params:
-        return np.full(n_params, np.nan)
+        nan = np.full(n_params, np.nan)
+        return np.full((n_params, n_params), np.nan), nan
 
     s2 = rss / (n_obs - n_params)
-    JtJ = jac.T @ jac
 
     try:
-        cov = np.linalg.inv(JtJ) * s2
-        se = np.sqrt(np.maximum(np.diag(cov), 0.0))
-    except np.linalg.LinAlgError:
-        se = np.full(n_params, np.nan)
+        H = _rss_hessian(rss_fn, popt)
+        cov = 2.0 * s2 * np.linalg.inv(H)
+        diag = np.diag(cov)
+        if not np.all(np.isfinite(diag)) or np.any(diag < 0):
+            raise np.linalg.LinAlgError("non-positive observed-information variance")
+    except (np.linalg.LinAlgError, ValueError, FloatingPointError):
+        # Fall back to the Gauss-Newton covariance.
+        try:
+            cov = np.linalg.inv(jac.T @ jac) * s2
+        except np.linalg.LinAlgError:
+            nan = np.full(n_params, np.nan)
+            return np.full((n_params, n_params), np.nan), nan
 
-    return se
+    se = np.sqrt(np.maximum(np.diag(cov), 0.0))
+    return cov, se
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +271,16 @@ def fit_drm(
     -------
     DoseResponseSolution
 
+    Notes
+    -----
+    Parameter standard errors (``.se``) and the covariance (``.cov``) use the
+    **observed-information** covariance ``s²·(½H)⁻¹`` — the inverse of the scaled
+    Hessian of the residual sum of squares, ``s² = RSS/(n-p)`` — which is what R
+    ``drc::drm()`` reports. This differs from the Gauss-Newton approximation
+    ``s²·(JᵀJ)⁻¹`` used by ``scipy.optimize.curve_fit`` / R ``nls`` by the
+    second-order curvature term; the two are asymptotically equivalent but can
+    differ by ~10% on a poorly-conditioned coefficient (e.g. the Hill slope).
+
     Examples
     --------
     >>> import numpy as np
@@ -265,6 +320,7 @@ def fit_drm(
             raise ValidationError("weights must have same shape as dose")
 
     # --- Starting values ---
+    start_was_none = start is None
     if start is None:
         start = _initial_params(dose, response, model)
     x0 = np.array([start[name] for name in param_names], dtype=np.float64)
@@ -286,15 +342,6 @@ def fit_drm(
     # Ensure starting values are within bounds
     x0 = np.clip(x0, lb + 1e-15, ub - 1e-15)
 
-    # --- Fast path: MINPACK LM with log(ec50) reparameterisation ---
-    #
-    # MINPACK's lmder Fortran routine runs the entire LM loop in compiled
-    # code, giving ~8× speedup over scipy's Python-level TRF loop.
-    # Reparameterising ec50 → log(ec50) removes the positivity bound,
-    # allowing method='lm' (which doesn't support bounds).
-    #
-    # Falls back to TRF for: custom bounds, weighted fits, non-LL.4 models
-    # without analytical Jacobians, or when LM fails to converge.
     jac_log_func = _JAC_LOG_MAP.get(model)
     use_lm = (
         jac_log_func is not None
@@ -302,66 +349,75 @@ def fit_drm(
         and not has_custom_bounds
     )
 
-    if use_lm:
-        # --- Fast path: MINPACK Fortran LM ---
-        x0_log = x0.copy()
-        x0_log[ec50_idx] = np.log(max(x0[ec50_idx], 1e-20))
+    def _fit_from(x0_in: NDArray):
+        """Run one least-squares fit from a single starting point.
 
-        def residuals_log(p: NDArray) -> NDArray:
-            p_real = p.copy()
-            p_real[ec50_idx] = np.exp(p[ec50_idx])
-            kwargs = dict(zip(param_names, p_real, strict=True))
-            return response - model_func(dose, **kwargs)
+        Fast path: MINPACK LM (compiled lmder, ~8× over scipy's Python TRF
+        loop) with an ec50 → log(ec50) reparameterisation that removes the
+        positivity bound so method='lm' can be used. Slow path (custom bounds,
+        weighted fits, or models without an analytical Jacobian): TRF.
+        """
+        if use_lm:
+            x0_log = x0_in.copy()
+            x0_log[ec50_idx] = np.log(max(x0_in[ec50_idx], 1e-20))
 
-        def jac_log(p: NDArray) -> NDArray:
-            return jac_log_func(dose, p)
+            def residuals_log(p: NDArray) -> NDArray:
+                p_real = p.copy()
+                p_real[ec50_idx] = np.exp(p[ec50_idx])
+                kwargs = dict(zip(param_names, p_real, strict=True))
+                return response - model_func(dose, **kwargs)
 
-        # max_nfev=200: converged fits use ~20-50 evals; 200 is generous.
-        # Unconverged data (flat responses, pure noise) should fail fast
-        # rather than burn 2000 evals at ~25µs each.
-        with np.errstate(over="ignore", invalid="ignore"):
-            result = least_squares(
-                residuals_log,
-                x0_log,
-                method="lm",
-                jac=jac_log,
-                max_nfev=200,
-                xtol=1e-12,
-                ftol=1e-12,
-                gtol=1e-12,
-            )
-        # Convert log(ec50) back to ec50
-        ec50_fitted = np.exp(result.x[ec50_idx])
-        result.x[ec50_idx] = ec50_fitted
-        # Transform Jacobian column from log-space to natural-space:
-        # ∂r/∂ec50 = ∂r/∂log_ec50 · ∂log_ec50/∂ec50 = ∂r/∂log_ec50 / ec50
-        if np.isfinite(ec50_fitted) and ec50_fitted > 0:
-            result.jac[:, ec50_idx] /= ec50_fitted
-        else:
-            result.success = False
-    else:
-        # --- Slow path: TRF with bounds ---
-        # Used when: custom bounds specified, weights given, or no
-        # analytical Jacobian for this model.
+            with np.errstate(over="ignore", invalid="ignore"):
+                res = least_squares(
+                    residuals_log, x0_log, method="lm",
+                    jac=lambda p: jac_log_func(dose, p),
+                    max_nfev=200, xtol=1e-12, ftol=1e-12, gtol=1e-12,
+                )
+            ec50_fitted = np.exp(res.x[ec50_idx])
+            res.x[ec50_idx] = ec50_fitted
+            # log-space → natural-space Jacobian column: ∂r/∂ec50 = ∂r/∂log_ec50 / ec50
+            if np.isfinite(ec50_fitted) and ec50_fitted > 0:
+                res.jac[:, ec50_idx] /= ec50_fitted
+            else:
+                res.success = False
+            return res
+
         def residuals(p: NDArray) -> NDArray:
             kwargs = dict(zip(param_names, p, strict=True))
-            pred = model_func(dose, **kwargs)
-            r = response - pred
+            r = response - model_func(dose, **kwargs)
             if weights is not None:
                 r = r * np.sqrt(weights)
             return r
 
-        result = least_squares(
-            residuals,
-            x0,
-            method="trf",
-            bounds=(lb, ub),
-            jac="2-point",
-            max_nfev=2000,
-            xtol=1e-12,
-            ftol=1e-12,
-            gtol=1e-12,
+        return least_squares(
+            residuals, x0_in, method="trf", bounds=(lb, ub), jac="2-point",
+            max_nfev=2000, xtol=1e-12, ftol=1e-12, gtol=1e-12,
         )
+
+    # --- Candidate starting points ---
+    # The Weibull-2 (W2.4) model has a mirror-image local optimum (swap the
+    # asymptotes, negate the Hill slope). On decreasing data the data-driven
+    # self-start seeds the wrong basin and converges silently to a ~14%-worse
+    # RSS with swapped asymptotes. For an auto-start W2.4 fit, also try the
+    # mirror start and keep whichever reaches the lower RSS — which recovers the
+    # natural-label global optimum. Multistart never worsens a fit (it keeps the
+    # better of the two). W1.4 is left untouched: it is the same curve family
+    # with asymptotes labelled oppositely, so mirroring it would flip its labels;
+    # its self-start already matches the reference.
+    candidates = [x0]
+    if start_was_none and model == "W2.4":
+        b_i, t_i, h_i = (param_names.index("bottom"),
+                         param_names.index("top"), param_names.index("hill"))
+        mirror = x0.copy()
+        mirror[b_i], mirror[t_i] = x0[t_i], x0[b_i]
+        mirror[h_i] = -x0[h_i]
+        mirror = np.clip(mirror, lb + 1e-15, ub - 1e-15)
+        candidates.append(mirror)
+
+    result = min(
+        (_fit_from(c) for c in candidates),
+        key=lambda r: float(np.sum(r.fun**2)),
+    )
 
     # --- Extract ---
     popt = result.x
@@ -371,7 +427,16 @@ def fit_drm(
     n_iter = result.nfev
 
     jac = result.jac
-    se = _compute_se(jac, rss, n_obs, n_params)
+
+    def _rss_of(theta: NDArray) -> float:
+        """RSS at an arbitrary parameter vector (same objective the fit minimised)."""
+        kwargs = dict(zip(param_names, theta, strict=True))
+        r = response - model_func(dose, **kwargs)
+        if weights is not None:
+            r = r * np.sqrt(weights)
+        return float(np.sum(r**2))
+
+    cov, se = _compute_cov_se(_rss_of, popt, jac, rss, n_obs, n_params)
 
     # AIC / BIC
     aic = float(n_obs * np.log(rss / n_obs) + 2 * n_params)
@@ -382,6 +447,7 @@ def fit_drm(
     params = DoseResponseParams(
         curve=curve_params,
         se=se,
+        cov=cov,
         residuals=res_vec,
         rss=rss,
         aic=aic,

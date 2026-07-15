@@ -144,7 +144,7 @@ class TestBasicFitting:
         y = rng.gamma(shape=5.0, scale=mu / 5.0)
         result = gee(y, X, cid, family="gamma", corr_structure="exchangeable")
         assert isinstance(result, GEESolution)
-        assert result.family_name == "Gamma"
+        assert result.family_name == "gamma"
 
 
 # ===========================================================================
