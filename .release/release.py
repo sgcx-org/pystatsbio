@@ -324,6 +324,18 @@ def cmd_release(new_version: str, commit: bool = False) -> None:
         print(f"ERROR: Tag v{new_version} already exists — aborting before any file changes.")
         sys.exit(1)
 
+    # Pre-flight: refuse when tracked files have unstaged modifications.
+    # --commit ships the index, not the working tree — an unstaged edit would be
+    # silently dropped from the release commit (sgcx-org/pystatsbio#2).
+    if commit:
+        dirty = run_git(["diff", "--name-only"]).stdout.split()
+        if dirty:
+            print("ERROR: unstaged changes to tracked files — aborting before any file changes.")
+            for path in dirty:
+                print(f"    {path}")
+            print("\nStage what belongs in this release (git add <file>) or stash it, then re-run.")
+            sys.exit(1)
+
     print(f"Releasing {package} {current} → {new_version}\n")
 
     # 1. Bump versions
