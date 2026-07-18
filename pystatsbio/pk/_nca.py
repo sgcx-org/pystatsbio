@@ -29,7 +29,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pystatistics.core.exceptions import ConvergenceError, ValidationError
 from pystatistics.core.result import Result
-from scipy import stats
+from pystatistics.regression import simple_ols
 
 from pystatsbio.pk._common import NCAParams, NCASolution
 
@@ -102,7 +102,7 @@ def _auc_loglinear_segment(t1: float, t2: float, c1: float, c2: float) -> float:
     """
     if c1 <= 0 or c2 <= 0 or c1 == c2:
         return _auc_linear_segment(t1, t2, c1, c2)
-    return (c1 - c2) * (t2 - t1) / np.log(c1 / c2)
+    return float((c1 - c2) * (t2 - t1) / np.log(c1 / c2))
 
 
 def _compute_auc_segments(
@@ -168,7 +168,7 @@ def _aumc_loglinear_segment(
     if c1 <= 0 or c2 <= 0 or c1 == c2:
         return _aumc_linear_segment(t1, t2, c1, c2)
     k = np.log(c1 / c2) / (t2 - t1)
-    return (t1 * c1 - t2 * c2) / k + (c1 - c2) / (k * k)
+    return float((t1 * c1 - t2 * c2) / k + (c1 - c2) / (k * k))
 
 
 def _compute_aumc_segments(
@@ -257,8 +257,9 @@ def _estimate_lambda_z(
     Raises
     ------
     LambdaZEstimationError
-        If there are insufficient terminal phase points or the fitted slope
-        is non-negative (not a true elimination phase).
+        If there are insufficient terminal phase points, the fixed terminal
+        window is degenerate (zero-variance time or log-concentration), or the
+        fitted slope is non-negative (not a true elimination phase).
     """
     # Terminal phase candidates: after Cmax, positive concentration
     idx_last = _find_last_measurable(concentration)
@@ -268,7 +269,7 @@ def _estimate_lambda_z(
         )
 
     # Candidates: indices from Cmax+1 to last measurable (inclusive)
-    candidates = []
+    candidates: list[int] = []
     for i in range(idx_cmax + 1, idx_last + 1):
         if concentration[i] > 0:
             candidates.append(i)
@@ -288,25 +289,30 @@ def _estimate_lambda_z(
                 f"(need at least 3)."
             )
 
-    candidates = np.array(candidates)
+    candidate_idx: NDArray[np.intp] = np.asarray(candidates, dtype=np.intp)
 
     if n_points is not None:
         # Fixed number of terminal points (from the end)
         if n_points < 3:
             raise ValidationError("lambda_z_n_points must be >= 3")
-        if n_points > len(candidates):
+        if n_points > len(candidate_idx):
             raise ValidationError(
                 f"lambda_z_n_points={n_points} exceeds available "
-                f"terminal points ({len(candidates)})"
+                f"terminal points ({len(candidate_idx)})"
             )
-        idx_use = candidates[-n_points:]
+        idx_use = candidate_idx[-n_points:]
         t_fit = time[idx_use]
         log_c_fit = np.log(concentration[idx_use])
-        slope, _, r_value, _, _ = stats.linregress(t_fit, log_c_fit)
+        try:
+            fit = simple_ols(t_fit, log_c_fit)
+        except ValidationError as exc:
+            raise LambdaZEstimationError(
+                f"Cannot estimate lambda_z: the fixed terminal window of "
+                f"{n_points} point(s) is degenerate ({exc})."
+            ) from exc
+        slope = fit.slope
         n_fit = n_points
-        # Adjusted R-squared
-        r_sq = r_value ** 2
-        r_sq_adj = 1.0 - (1.0 - r_sq) * (n_fit - 1) / (n_fit - 2) if n_fit > 2 else r_sq
+        r_sq_adj = fit.adjusted_r_squared
     else:
         # Auto-select the terminal window by the "Adjusted R-squared Best Fit"
         # (ARS) rule used by Phoenix WinNonlin / R NonCompart::sNCA: fit the last
@@ -316,17 +322,17 @@ def _estimate_lambda_z(
         # strict argmax) is the pharmacometrics standard and matches the reference
         # NCA tools.
         fits = []  # (n_try, slope, r_sq_adj)
-        for n_try in range(3, len(candidates) + 1):
-            idx_use = candidates[-n_try:]
-            s, _, r_value, _, _ = stats.linregress(
-                time[idx_use], np.log(concentration[idx_use])
-            )
-            r_sq = r_value ** 2
-            r_sq_adj_try = 1.0 - (1.0 - r_sq) * (n_try - 1) / (n_try - 2)
-            fits.append((n_try, s, r_sq_adj_try))
+        for n_try in range(3, len(candidate_idx) + 1):
+            idx_use = candidate_idx[-n_try:]
+            try:
+                fit = simple_ols(time[idx_use], np.log(concentration[idx_use]))
+            except ValidationError:
+                # A flat/degenerate window (zero-variance time or
+                # log-concentration) is not a usable candidate. Skip it, so the
+                # elimination-phase check below fails loud when no window is.
+                continue
+            fits.append((n_try, fit.slope, fit.adjusted_r_squared))
 
-        # A flat/degenerate profile gives a non-finite adjusted R-squared; drop
-        # those so the elimination-phase check below fails loud (lambda_z=None).
         finite_fits = [f for f in fits if np.isfinite(f[2])]
         if not finite_fits:
             slope, r_sq_adj, n_fit = None, float("nan"), 0

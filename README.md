@@ -368,7 +368,7 @@ pip install pystatsbio[gpu]
 pip install pystatsbio[dev]
 ```
 
-Requires Python 3.11+. Core dependencies: `pystatistics`, `numpy`, `scipy`.
+Requires Python 3.11+. Core dependencies: `pystatistics>=5.1`, `numpy`, `scipy`.
 
 ---
 
