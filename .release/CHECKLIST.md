@@ -21,7 +21,13 @@
 
 ## Items `release.py --commit` does NOT handle
 
-- ⚠️⚠️ **README.md** — pre-stage before running --commit
+- ⚠️⚠️ **Staging every change that belongs in the release.** `--commit` ships
+  the *index*, not the working tree: any tracked file left modified-but-unstaged
+  is silently dropped from the release commit. `git add` everything that belongs
+  in this release before running `--commit` — source changes included, not just
+  the version/doc files. README.md is the most commonly forgotten one, but the
+  rule applies to every file. The script now refuses to run with unstaged
+  changes to tracked files rather than committing a partial release.
 - ⚠️ **GitHub release creation** — intentionally manual (kept as a
   sanity checkpoint before anything hits PyPI)
 
