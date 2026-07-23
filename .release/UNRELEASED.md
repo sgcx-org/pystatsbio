@@ -10,4 +10,11 @@
 
 ## Changes
 
-*(empty — no unreleased changes yet)*
+- Docs: fixed docstring formatting so the Sphinx API reference renders
+  cleanly. Set ``napoleon_use_ivar`` so dataclass "Attributes" sections
+  render as inline field lists instead of duplicate object descriptions
+  (removed ~73 "duplicate object description" warnings), and escaped the
+  ``1 / |RD|`` expression in ``Epi2x2Params`` so it is no longer misread
+  as an undefined RST substitution. No behavior, signature, or
+  documented-value changes — docstring/config formatting only. The docs
+  now build warning-free under ``sphinx-build -W``.

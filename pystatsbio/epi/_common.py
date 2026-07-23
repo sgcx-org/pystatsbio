@@ -70,7 +70,7 @@ class Epi2x2Params:
     population_attributable_fraction : EpiMeasure
         Population attributable fraction (Levin formula).
     nnt : EpiMeasure
-        Number needed to treat: 1 / |RD|.
+        Number needed to treat: ``1 / |RD|``.
     table : NDArray
         The original (possibly corrected) 2x2 table.
     """
