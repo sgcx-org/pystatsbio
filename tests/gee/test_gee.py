@@ -607,6 +607,11 @@ class TestGeeGPU:
             and torch.backends.mps.is_available()
         )
 
+    def _gpu_device(self) -> str:
+        """Device string of the available GPU ('cuda' preferred over 'mps')."""
+        import torch
+        return "cuda" if torch.cuda.is_available() else "mps"
+
     def test_invalid_backend_raises(self):
         y, X, cid, _ = _gaussian_clustered_data()
         with pytest.raises(ValueError, match="backend"):
@@ -628,6 +633,38 @@ class TestGeeGPU:
         monkeypatch.setattr(dev_mod, "detect_gpu", lambda *a, **k: None)
         r = gee(y, X, cid, family="gaussian", backend="auto")
         assert r.converged
+
+    @staticmethod
+    def _fake_mps_device():
+        from pystatistics.core.compute.device import DeviceInfo
+        return DeviceInfo(
+            device_type="mps", device_index=0, name="Apple Silicon GPU",
+            memory_bytes=None, compute_capability=None,
+        )
+
+    def test_auto_backend_routes_mps_to_cpu(self, monkeypatch):
+        """backend='auto' uses CPU on an MPS-only machine: 'auto' means
+        CUDA if present, else CPU. MPS (fp32-only) runs only on an
+        explicit backend='gpu'."""
+        y, X, cid, _ = _gaussian_clustered_data()
+        from pystatistics.core.compute import device as dev_mod
+        monkeypatch.setattr(
+            dev_mod, "detect_gpu", lambda *a, **k: self._fake_mps_device(),
+        )
+        r = gee(y, X, cid, family="gaussian", backend="auto")
+        assert r.converged
+        assert r.backend_name == "cpu"
+
+    def test_gpu_fp64_on_mps_raises(self, monkeypatch):
+        """backend='gpu_fp64' on an MPS-only machine raises explicitly —
+        Apple Silicon has no float64 (Rule 1: no silent downgrade)."""
+        y, X, cid, _ = _gaussian_clustered_data()
+        from pystatistics.core.compute import device as dev_mod
+        monkeypatch.setattr(
+            dev_mod, "detect_gpu", lambda *a, **k: self._fake_mps_device(),
+        )
+        with pytest.raises(RuntimeError, match="requires CUDA"):
+            gee(y, X, cid, family="gaussian", backend="gpu_fp64")
 
     def test_gpu_fp64_matches_cpu_coefs(self):
         """GPU FP64 matches CPU coefficients and robust SE to machine
@@ -678,7 +715,7 @@ class TestGeeGPU:
         if not self._gpu_available():
             pytest.skip("no GPU available")
         y, X, cid, _ = _gaussian_clustered_data()
-        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to("cuda")
+        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to(self._gpu_device())
         r_numpy = gee(y, X, cid, family="gaussian",
                       corr_structure="exchangeable", backend="gpu")
         r_tensor = gee(gds["y"], gds["X"], gds["cid"],
@@ -696,7 +733,7 @@ class TestGeeGPU:
         if not self._gpu_available():
             pytest.skip("no GPU available")
         y, X, cid, _ = _gaussian_clustered_data()
-        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to("cuda")
+        gds = DataSource.from_arrays(X=X, y=y, cid=cid).to(self._gpu_device())
         with pytest.raises(ValueError, match="torch.Tensor"):
             gee(gds["y"], gds["X"], gds["cid"],
                 family="gaussian", backend="cpu")

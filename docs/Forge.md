@@ -126,7 +126,7 @@ Forge uses an optimized dual-drive setup designed specifically for ML workloads:
 - **DNS**: Local network resolution for easy connection
 
 ### Remote Development Workflow
-- **Primary Client**: Mac Studio ("Mainframe") for development
+- **Primary Client**: Mac Studio ("Powerhouse", formerly "Mainframe") for development
 - **IDE Integration**: VS Code with Remote-SSH extension
 - **Notebook Access**: Jupyter Lab tunneled through SSH
 - **File Transfer**: Direct SSH/SCP for large files

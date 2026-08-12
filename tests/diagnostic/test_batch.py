@@ -95,26 +95,61 @@ def _has_cuda() -> bool:
         return False
 
 
+def _has_mps() -> bool:
+    try:
+        import torch
+        return hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    except ImportError:
+        return False
+
+
+def _has_supported_gpu() -> bool:
+    """CUDA, or MPS with the torch >= 2.13 native Metal kernels."""
+    from pystatsbio.diagnostic._batch import _mps_native_kernels
+
+    return _has_cuda() or (_has_mps() and _mps_native_kernels())
+
+
 class TestBatchGPU:
-    """GPU batch AUC (CUDA only — MPS scatter_add_ is too slow)."""
+    """GPU batch AUC (CUDA, or MPS with torch >= 2.13)."""
 
     @pytest.fixture(autouse=True)
-    def requires_cuda(self):
-        if not _has_cuda():
-            pytest.skip("batch_auc GPU requires CUDA (MPS not supported)")
+    def requires_gpu(self):
+        if not _has_supported_gpu():
+            pytest.skip("batch_auc GPU requires CUDA, or MPS with torch >= 2.13")
 
     def test_gpu_runs(self, batch_data):
         response, predictors = batch_data
         r = batch_auc(response, predictors, backend="gpu")
         assert r.n_markers == predictors.shape[1]
 
-    def test_gpu_matches_cpu(self, batch_data):
-        """GPU results should match CPU results."""
+    def test_gpu_matches_cpu_at_gpu_fp32_tier(self, batch_data):
+        """GPU fp32 results must match the CPU fp64 reference at GPU_FP32."""
+        from pystatistics.core.compute.tolerances import GPU_FP32
+
         response, predictors = batch_data
         r_cpu = batch_auc(response, predictors, backend="cpu")
         r_gpu = batch_auc(response, predictors, backend="gpu")
-        assert np.allclose(r_cpu.auc, r_gpu.auc, atol=0.01)
-        assert np.allclose(r_cpu.se, r_gpu.se, atol=0.01)
+        assert np.allclose(r_cpu.auc, r_gpu.auc, rtol=GPU_FP32.rtol, atol=GPU_FP32.atol)
+        assert np.allclose(r_cpu.se, r_gpu.se, rtol=GPU_FP32.rtol, atol=GPU_FP32.atol)
+
+    def test_gpu_matches_cpu_with_ties(self):
+        """Tied values stress the midrank tie-group scatter; must still match."""
+        from pystatistics.core.compute.tolerances import GPU_FP32
+
+        rng = np.random.default_rng(7)
+        n, m = 300, 50
+        response = np.zeros(n, dtype=np.intp)
+        response[: n // 2] = 1
+        rng.shuffle(response)
+        # Coarsely discretized values: many ties per column
+        predictors = np.round(rng.standard_normal((n, m)) * 2) / 2
+        predictors[response == 1, : m // 5] += 1.0
+
+        r_cpu = batch_auc(response, predictors, backend="cpu")
+        r_gpu = batch_auc(response, predictors, backend="gpu")
+        assert np.allclose(r_cpu.auc, r_gpu.auc, rtol=GPU_FP32.rtol, atol=GPU_FP32.atol)
+        assert np.allclose(r_cpu.se, r_gpu.se, rtol=GPU_FP32.rtol, atol=GPU_FP32.atol)
 
     def test_gpu_auc_bounded(self, batch_data):
         response, predictors = batch_data
@@ -123,16 +158,74 @@ class TestBatchGPU:
         assert np.all(r.auc <= 1)
 
 
-class TestBatchMPSRejected:
-    """MPS should raise RuntimeError, not silently crawl."""
+class TestBatchMPS:
+    """MPS gating: supported on torch >= 2.13, loud failure below."""
 
-    def test_mps_raises(self, batch_data):
-        torch = pytest.importorskip("torch")
-        if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+    def test_old_torch_raises(self, batch_data):
+        """On torch < 2.13, MPS must raise RuntimeError, not silently crawl."""
+        from pystatsbio.diagnostic._batch import _mps_native_kernels
+
+        if not _has_mps():
             pytest.skip("MPS not available")
+        if _has_cuda():
+            pytest.skip("CUDA present — backend='gpu' resolves to CUDA")
+        if _mps_native_kernels():
+            pytest.skip("torch >= 2.13 — MPS is supported")
         response, predictors = batch_data
-        with pytest.raises(RuntimeError, match="not supported on MPS"):
+        with pytest.raises(RuntimeError, match="requires torch >= 2.13"):
             batch_auc(response, predictors, backend="gpu")
+
+    def test_new_torch_runs_on_mps(self, batch_data):
+        """On torch >= 2.13, backend='gpu' runs on MPS and reports it."""
+        from pystatsbio.diagnostic._batch import _mps_native_kernels
+
+        if not _has_mps():
+            pytest.skip("MPS not available")
+        if _has_cuda():
+            pytest.skip("CUDA present — backend='gpu' resolves to CUDA")
+        if not _mps_native_kernels():
+            pytest.skip("torch < 2.13 — MPS not supported")
+        response, predictors = batch_data
+        r = batch_auc(response, predictors, backend="gpu")
+        assert "mps" in r.backend_name
+
+    def test_auto_routes_by_torch_version(self, batch_data):
+        """'auto' picks MPS on torch >= 2.13, CPU below (MPS-only machines)."""
+        from pystatsbio.diagnostic._batch import _mps_native_kernels
+
+        if not _has_mps():
+            pytest.skip("MPS not available")
+        if _has_cuda():
+            pytest.skip("CUDA present — 'auto' resolves to CUDA")
+        response, predictors = batch_data
+        r = batch_auc(response, predictors, backend="auto")
+        if _mps_native_kernels():
+            assert "mps" in r.backend_name
+        else:
+            assert r.backend_name == "cpu"
+
+
+class TestMPSNativeKernelsPredicate:
+    """Version parsing in the torch >= 2.13 predicate (machine-independent)."""
+
+    @pytest.mark.parametrize(
+        ("version", "expected"),
+        [
+            ("2.12.1", False),
+            ("2.13.0", True),
+            ("2.13.0+cpu", True),
+            ("2.14.0a0+git1234ab", True),
+            ("3.0.0", True),
+            ("2.9.0", False),
+            ("garbage", False),
+        ],
+    )
+    def test_versions(self, monkeypatch, version, expected):
+        torch = pytest.importorskip("torch")
+        from pystatsbio.diagnostic import _batch
+
+        monkeypatch.setattr(torch, "__version__", version)
+        assert _batch._mps_native_kernels() is expected
 
 
 # ---------------------------------------------------------------------------

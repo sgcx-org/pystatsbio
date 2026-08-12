@@ -3,7 +3,8 @@
 Computes AUC (Mann-Whitney U / (n1*n0)) and DeLong standard errors for
 many biomarker candidates simultaneously.  The CPU path uses
 ``scipy.stats.rankdata`` column-wise.  The GPU path uses PyTorch's
-batched ``argsort`` for ranking and a vectorised masked sum.
+batched ``argsort`` for ranking and a vectorised masked sum; it runs on
+CUDA, or on MPS (Apple Silicon) with torch >= 2.13.
 
 GPU is beneficial when ``n_markers > 100``.
 """
@@ -134,23 +135,50 @@ def _batch_auc_cpu(
 # GPU path
 # ---------------------------------------------------------------------------
 
+def _mps_native_kernels() -> bool:
+    """Whether the installed torch has the PyTorch 2.13 native-Metal kernels.
+
+    PyTorch 2.13 (July 2026) moved MPS ``scatter``/``gather`` (among other
+    ops) from MPSGraph-routed implementations to hand-written Metal kernels,
+    turning ``scatter_add_`` with sparse targets — the op this module's
+    midrank kernel is bound by — from ~1000× slower than the CPU into ~8×
+    faster (see docs/GPU_BACKEND_NOTES.md). Local re-implementation of the
+    ``pystatistics.core.compute.device.mps_native_kernels`` predicate
+    pattern; not imported from pystatistics because no released pystatistics
+    carries it yet.
+    """
+    import torch
+
+    version = str(torch.__version__).split("+")[0]
+    parts = version.split(".")
+    try:
+        major, minor = int(parts[0]), int(parts[1])
+    except (IndexError, ValueError):
+        # Unparseable version string: assume old kernels (the conservative
+        # path is correct on every torch, just slower on >= 2.13).
+        return False
+    return (major, minor) >= (2, 13)
+
+
 def _batch_auc_gpu(
-    response: NDArray, predictors: NDArray, *, use_fp64: bool,
+    response: NDArray, predictors: NDArray, *, use_fp64: bool, device_type: str,
 ) -> BatchAUCSolution:
-    """Batched AUC + DeLong SE on a CUDA GPU via PyTorch.
+    """Batched AUC + DeLong SE on a CUDA or MPS GPU via PyTorch.
 
     Fully vectorized: no Python loops over markers or samples.
     Uses batched argsort for ranking and vectorized tie detection
     via diff-based boundary detection with cumsum grouping.
 
-    The caller resolves the backend and guarantees a CUDA device (MPS is
-    rejected upstream — its ``scatter_add_`` is ~1000× slower for this
-    workload). ``use_fp64`` selects float64 (``backend='gpu_fp64'``) over the
-    float32 speed default (``backend='gpu'``).
+    The caller resolves the backend and guarantees ``device_type`` is
+    ``'cuda'``, or ``'mps'`` with the torch >= 2.13 native Metal kernels
+    (older-torch MPS is rejected upstream — its MPSGraph-routed
+    ``scatter_add_`` is ~1000× slower than the CPU for this workload).
+    ``use_fp64`` selects float64 (``backend='gpu_fp64'``, CUDA-only — MPS
+    has no float64) over the float32 speed default (``backend='gpu'``).
     """
     import torch
 
-    device = torch.device("cuda")
+    device = torch.device(device_type)
     dtype = torch.float64 if use_fp64 else torch.float32
 
     N, M = predictors.shape
@@ -158,7 +186,9 @@ def _batch_auc_gpu(
     n1 = int(case_mask_np.sum())
     n0 = N - n1
 
-    pred_t = torch.from_numpy(predictors).to(device=device, dtype=dtype)
+    # Cast on the host first: MPS tensors cannot hold float64, and for
+    # float32 this also halves the host-to-device transfer.
+    pred_t = torch.from_numpy(predictors).to(dtype=dtype).to(device=device)
 
     # Pooled midranks — fully vectorized across all M columns
     pooled_ranks_gpu = _midranks_vectorized(pred_t, device, dtype)
@@ -291,11 +321,13 @@ def batch_auc(
         Matrix of biomarker values (one column per candidate marker).
     backend : str
         Execution target (device and precision), per the pystatistics
-        convention: ``'cpu'`` (float64), ``'gpu'`` (CUDA float32),
-        ``'gpu_fp64'`` (CUDA float64), or ``'auto'`` (CUDA float32 if present,
-        else CPU). The GPU path is CUDA-only: Apple Silicon (MPS) is rejected
-        for this workload because its ``scatter_add_`` is ~1000× slower than
-        the CPU.
+        convention: ``'cpu'`` (float64), ``'gpu'`` (GPU float32),
+        ``'gpu_fp64'`` (CUDA float64), or ``'auto'`` (best available: CUDA
+        float32 if present, else MPS float32 on torch >= 2.13, else CPU).
+        On Apple Silicon (MPS) the GPU path requires torch >= 2.13, whose
+        native Metal ``scatter_add_`` made this workload GPU-fast; on older
+        torch it is ~1000× slower than the CPU, so ``'gpu'`` raises
+        ``RuntimeError`` and ``'auto'`` falls back to the CPU.
 
     Returns
     -------
@@ -334,15 +366,36 @@ def batch_auc(
         )
 
     target = resolve_backend(backend, supports_fp64=True)
+
     if target.device_type == "cpu":
+        # Core policy resolves 'auto' to CPU on MPS-only machines (MPS is
+        # float32-only and not the R-validated default). batch_auc overrides
+        # that for itself: under torch >= 2.13 its scatter_add_-bound midrank
+        # kernel is faster on MPS than on the CPU (docs/GPU_BACKEND_NOTES.md),
+        # so 'auto' — "best available" — picks MPS exactly when that holds.
+        if backend == "auto":
+            from pystatistics.core.compute.device import detect_gpu
+
+            gpu = detect_gpu()
+            if gpu is not None and gpu.device_type == "mps" and _mps_native_kernels():
+                return _batch_auc_gpu(
+                    response, predictors, use_fp64=False, device_type="mps",
+                )
         return _batch_auc_cpu(response, predictors)
-    if target.device_type == "mps":
-        # MPS scatter_add_ is catastrophically slow for the midrank
-        # computation (~1000× slower than CPU). Fail fast rather than
-        # silently delivering a 15-minute wait.
+
+    if target.device_type == "mps" and not _mps_native_kernels():
+        import torch
+
+        # Old MPSGraph-routed scatter_add_ is catastrophically slow for the
+        # midrank computation (~1000× slower than CPU). Fail fast rather
+        # than silently delivering a 15-minute wait.
         raise RuntimeError(
-            "batch_auc GPU backend is not supported on MPS (Apple Silicon). "
-            "MPS scatter_add_ is ~1000× slower than CPU for this workload. "
-            "Use backend='cpu' instead."
+            "batch_auc GPU backend is not supported on MPS (Apple Silicon) "
+            f"with torch {torch.__version__}: it requires torch >= 2.13, "
+            "whose native Metal kernels fixed scatter_add_ (~1000× slower "
+            "than CPU before). Upgrade torch, or use backend='cpu'."
         )
-    return _batch_auc_gpu(response, predictors, use_fp64=target.use_fp64)
+
+    return _batch_auc_gpu(
+        response, predictors, use_fp64=target.use_fp64, device_type=target.device_type,
+    )
