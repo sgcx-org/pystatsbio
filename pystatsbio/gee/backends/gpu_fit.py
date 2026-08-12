@@ -91,9 +91,31 @@ def _initialize_beta_gpu(
         w_sqrt = torch.sqrt(torch.clamp(w, min=1e-10))
         Xw = X_gpu * w_sqrt.unsqueeze(1)
         zw = z * w_sqrt
-        # Weighted least squares via lstsq (batched on GPU).
-        sol = torch.linalg.lstsq(Xw, zw.unsqueeze(1))
-        beta_new = sol.solution.squeeze(1)
+        if X_gpu.device.type == "cuda":
+            # Weighted least squares via lstsq (QR-based on CUDA).
+            sol = torch.linalg.lstsq(Xw, zw.unsqueeze(1))
+            beta_new = sol.solution.squeeze(1)
+        else:
+            # MPS: aten::linalg_lstsq has never been implemented (still
+            # NotImplementedError on torch 2.13), so solve the normal
+            # equations X'WX beta = X'Wz by Cholesky instead. X'WX is
+            # SPD for full-rank X; squaring the condition number is
+            # acceptable for a starting value the GEE iteration refines.
+            Xw_t = Xw.transpose(0, 1)
+            G = Xw_t @ Xw
+            c = Xw_t @ zw
+            try:
+                L = torch.linalg.cholesky(G)
+            except RuntimeError:
+                # Near-singular X'WX: same ridge fallback as
+                # _solve_update.
+                ridge = torch.eye(
+                    p, device=X_gpu.device, dtype=X_gpu.dtype,
+                ) * 1e-6
+                L = torch.linalg.cholesky(G + ridge)
+            beta_new = torch.cholesky_solve(
+                c.unsqueeze(-1), L,
+            ).squeeze(-1)
 
         eta_new = X_gpu @ beta_new
         mu_new = fam_ops.linkinv(eta_new)
@@ -362,19 +384,24 @@ def fit_gee_gpu(
     inv_order[order_gpu] = torch.arange(
         n, device=torch_device, dtype=torch.long,
     )
-    fitted = mu_final.index_select(0, inv_order).to(torch.float64).cpu().numpy()
-    residuals = pearson_final.index_select(0, inv_order).to(
+    # D2H first, widen to float64 on the host: MPS tensors cannot hold
+    # float64, and fp32→fp64 widening is exact so the order is
+    # numerically irrelevant on CUDA.
+    fitted = mu_final.index_select(0, inv_order).cpu().to(
         torch.float64,
-    ).cpu().numpy()
-    beta_np = beta.to(torch.float64).cpu().numpy()
-    naive_vcov = naive_vcov_gpu.to(torch.float64).cpu().numpy()
-    robust_vcov = robust_vcov_gpu.to(torch.float64).cpu().numpy()
+    ).numpy()
+    residuals = pearson_final.index_select(0, inv_order).cpu().to(
+        torch.float64,
+    ).numpy()
+    beta_np = beta.cpu().to(torch.float64).numpy()
+    naive_vcov = naive_vcov_gpu.cpu().to(torch.float64).numpy()
+    robust_vcov = robust_vcov_gpu.cpu().to(torch.float64).numpy()
 
     if scale_fix is not None:
         phi = float(scale_fix)
     else:
         phi = max(
-            float(sum_r2_final.to(torch.float64).cpu().item()) / (n - p),
+            float(sum_r2_final.cpu().to(torch.float64).item()) / (n - p),
             1e-10,
         )
 

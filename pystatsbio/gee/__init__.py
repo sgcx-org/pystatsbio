@@ -172,11 +172,14 @@ def gee(
     backend : str | None
         Execution target (device and precision), following the pystatistics
         convention: ``'cpu'`` (float64, the reference path), ``'gpu'``
-        (float32), ``'gpu_fp64'`` (float64, CUDA only — raises on Apple
-        Silicon/MPS, which has no float64), or ``'auto'`` (CUDA if present,
-        else CPU). ``None`` resolves from the input: a numpy array → ``'cpu'``,
-        a GPU ``torch.Tensor`` → ``'gpu'``. Precision lives in the backend
-        string; there is no separate ``use_fp64`` flag.
+        (float32, CUDA or Apple Silicon/MPS), ``'gpu_fp64'`` (float64, CUDA
+        only — raises on Apple Silicon/MPS, which has no float64), or
+        ``'auto'`` (CUDA if present, else CPU — never MPS; MPS runs only on
+        an explicit ``'gpu'``, and is currently slower than the CPU for GEE:
+        see docs/GPU_BACKEND_NOTES.md). ``None`` resolves from the input: a
+        numpy array → ``'cpu'``, a GPU ``torch.Tensor`` → ``'gpu'``.
+        Precision lives in the backend string; there is no separate
+        ``use_fp64`` flag.
 
     Returns
     -------
@@ -322,7 +325,14 @@ def gee(
         dev = select_device(
             "gpu" if backend in ("gpu", "gpu_fp64") else "auto"
         )
-        if dev.is_gpu:
+        # 'auto' means CUDA if present, else CPU — it never auto-selects
+        # MPS (fp32-only, not the R-validated default; see the dispatch
+        # note on pystatistics select_device). MPS runs only when the
+        # caller asks for backend='gpu' explicitly.
+        use_gpu = dev.is_gpu and (
+            backend != "auto" or dev.device_type == "cuda"
+        )
+        if use_gpu:
             if want_fp64 and dev.device_type != "cuda":
                 from pystatistics.core.compute.backend import (
                     FP64_REQUIRES_CUDA_MSG,

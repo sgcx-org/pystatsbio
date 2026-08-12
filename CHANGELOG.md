@@ -1,5 +1,25 @@
 # Changelog
 
+## 4.0.3
+
+- `pk.nca` now delegates terminal-slope (lambda_z) estimation to
+  `pystatistics.regression.simple_ols` instead of `scipy.stats.linregress`
+  (`pystatsbio/pk/_nca.py::_estimate_lambda_z`). Estimated lambda_z, adjusted
+  R-squared, and the selected terminal window are unchanged: the adjusted
+  R-squared best-fit (ARS) window-selection rule and its 1e-4 near-tie
+  tolerance are preserved exactly. Requires `pystatistics>=5.1` (raised from
+  `>=5.0`).
+- Degenerate terminal windows in `pk.nca` are now handled through the library's
+  own error type instead of depending on scipy's edge-case behaviour: a
+  zero-variance window raises `LambdaZEstimationError` (fixed
+  `lambda_z_n_points=`) or is skipped as a candidate (auto-select), which
+  `nca()` reports as `lambda_z=None` plus an explanatory warning. This is
+  defensive hardening, not a user-visible fix — duplicate time points are
+  already rejected at input validation, and a flat terminal window already
+  failed the existing non-negative-slope check. Previously a zero-variance
+  window would have surfaced as a raw `scipy` `ValueError` escaping `nca()`.
+
+
 ## 4.0.2
 
 ### Summary
@@ -393,7 +413,7 @@ Fully vectorized GPU `batch_auc` kernel (49-63x speedup on CUDA), 19x faster CPU
 ### Changed
 
 - **`batch_auc(backend='gpu')`**: Replaced sequential per-marker Python loops with fully vectorized tie detection using `diff` + `cumsum` for group IDs and `scatter_add_` for midrank computation. Zero Python loops touch GPU tensors.
-- **`batch_auc(backend='gpu')` on MPS**: Now raises `RuntimeError` instead of silently running ~1000x slower than CPU. Metal's `scatter_add_` does not handle the sparse scatter pattern used by the vectorized midrank kernel efficiently (tested at 1350x slower on M2 Ultra with 5K markers).
+- **`batch_auc(backend='gpu')` on MPS**: Now raises `RuntimeError` instead of silently running ~1000x slower than CPU. Metal's `scatter_add_` does not handle the sparse scatter pattern used by the vectorized midrank kernel efficiently (tested at 1350x slower on M2 Max with 5K markers).
 - **`batch_auc(backend='auto')` on Apple Silicon**: Now correctly routes to CPU.
 - **`fit_drm` optimizer**: Uses `method='lm'` (MINPACK `lmder` Fortran routine) instead of `method='trf'`. The entire Levenberg-Marquardt iteration loop runs in compiled Fortran, eliminating Python-level overhead (~150 iterations x function call overhead per fit). Falls back to TRF only when custom bounds or weights are explicitly requested.
 - **LL.4 analytical Jacobian**: Closed-form derivatives replace 2-point numerical finite differences. Eliminates 4x redundant function evaluations per Jacobian computation. Uses `scipy.special.expit` for numerically stable sigmoid.
